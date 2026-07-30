@@ -1,0 +1,126 @@
+from rdflib import Graph, RDF, RDFS, OWL
+from rdflib.plugins.parsers.notation3 import BadSyntax
+
+
+def remove_prefix(uri: str, prefix: str = None) -> str:
+    """Utility helper to strip prefixes or URI brackets."""
+    token = str(uri).strip("<> ")
+    if prefix and token.startswith(prefix):
+        return token[len(prefix):]
+    return token.split('/')[-1].split('#')[-1]
+
+class Ontology:
+    def __init__(self, classes=None, properties=None):
+        self.classes = classes if classes is not None else dict()
+        self.properties = properties if properties is not None else dict()
+
+    def add_class(self, prefix: str, c: str, super_class: str = ""):
+        classname = remove_prefix(c, prefix)
+        if classname not in self.classes:
+            self.classes[classname] = set()
+        if super_class:
+            super_name = remove_prefix(super_class, prefix)
+            self.classes[classname].add(super_name)
+
+    def add_property(self, prefix: str, p: str, d=None, r=None):
+        p_name = remove_prefix(p, prefix)
+        domains = {remove_prefix(x, prefix) for x in d} if d else set()
+        ranges = {remove_prefix(x, prefix) for x in r} if r else set()
+
+        if p_name not in self.properties:
+            self.properties[p_name] = (domains, ranges)
+        else:
+            self.properties[p_name][0].update(domains)
+            self.properties[p_name][1].update(ranges)
+
+    def get_all_supertypes(self, class_name: str) -> set[str]:
+        """Recursively collects all direct and indirect superclasses (transitive closure)."""
+        visited = set()
+        queue = [class_name]
+
+        while queue:
+            curr = queue.pop(0)
+            if curr not in visited:
+                visited.add(curr)
+                parents = self.classes.get(curr, set())
+                queue.extend(parents - visited)
+
+        return visited
+
+    def fits_domain_range(self, triple, kg, type_predicate, check_domain=True, check_range=True):
+        """
+                Validates if a given triple (s, p, o) satisfies the ontology domain and range constraints.
+                If domain/range are unspecified in the ontology for predicate p, it passes by default.
+                """
+        subject, predicate, obj = triple
+
+        p_name = remove_prefix(predicate)
+        if p_name not in self.properties:
+            return True
+
+        domain_types, range_types = self.properties[p_name]
+
+        if check_domain and domain_types:
+            s_types = self._get_entity_types(subject, kg, type_predicate)
+            if not s_types:
+                return False
+
+            s_expanded_types = set()
+            for t in s_types:
+                s_expanded_types.update(self.get_all_supertypes(t))
+
+            if not domain_types.intersection(s_expanded_types):
+                return False
+
+        if check_range and range_types:
+            o_types = self._get_entity_types(obj, kg, type_predicate)
+            if not o_types:
+                return False
+
+            o_expanded_types = set()
+            for t in o_types:
+                o_expanded_types.update(self.get_all_supertypes(t))
+
+            if not range_types.intersection(o_expanded_types):
+                return False
+
+        return True
+
+    def _get_entity_types(self, entity: str, kg, type_predicate: str) -> set[str]:
+        """Queries knowledge graph for all type classes associated with an entity."""
+        types = set()
+        type_triples = kg.get_triples(subject=entity, predicate=type_predicate)
+        for _, _, t in type_triples:
+            types.add(remove_prefix(t))
+        return types
+
+
+def parse_ontology(ontology_file: str, prefix: str = "") -> Ontology:
+    """Parses a Turtle (.ttl) ontology file using RDFLib into an Ontology object."""
+    g = Graph()
+    try:
+        g.parse(ontology_file, format='turtle')
+    except BadSyntax as e:
+        print(f"Syntax error in {ontology_file}:")
+        print(f"Line {e.lines}: {e.msg}")
+        raise e
+    ontology = Ontology()
+
+    def get_name(node):
+        return str(node).split('/')[-1].split('#')[-1]
+
+    for c in g.subjects(RDF.type, OWL.Class):
+        ontology.add_class(prefix, get_name(c))
+    for c in g.subjects(RDF.type, RDFS.Class):
+        ontology.add_class(prefix, get_name(c))
+
+    for sub, sup in g.subject_objects(RDFS.subClassOf):
+        ontology.add_class(prefix, get_name(sub), get_name(sup))
+
+    for p_type in [OWL.ObjectProperty, OWL.DatatypeProperty, RDF.Property]:
+        for p in g.subjects(RDF.type, p_type):
+            domains = {get_name(d) for d in g.objects(p, RDFS.domain)}
+            ranges = {get_name(r) for r in g.objects(p, RDFS.range)}
+            ontology.add_property(prefix, get_name(p), domains, ranges)
+
+    return ontology

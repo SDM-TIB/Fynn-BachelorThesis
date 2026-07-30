@@ -2,6 +2,11 @@ import argparse
 import time
 from KnowledgeGraph.Graph import Graph
 from pathlib import Path
+from Ontology import parse_ontology
+from RuleMining import mine_rules
+from NegativeExampleGeneration import generate_negative_triples
+from KnowledgeGraph.MemoryKG import MemoryKG
+from Validation import shacl_validation
 
 parser = argparse.ArgumentParser(description="")
 
@@ -10,12 +15,14 @@ parser.add_argument("--kg-name",
                     type=str,
                     help="The name of the knowledge graph")
 parser.add_argument("--kg-path",
-                    required=True,
-                    help="The path to the knowledge graph file (.nt)")
+                    help="The path to the knowledge graph file (.nt). This is required if --kg-access-method is 'memory' or 'memory-numerical'.")
+parser.add_argument("--sparql-access-url",
+                    type=str,
+                    help="The URL to the SPARQL endpoint to access the knowledge graph. This is required if --kg-access-method is 'hybrid' or 'SPARQL'.")
 parser.add_argument("--constraint-path",
                     required=True,
                     type=Path,
-                    help="The path to the constraint file (.ttl)")
+                    help="The path to the folder containing the constraint file (.ttl)")
 parser.add_argument("--ontology-path",
                     required=True,
                     type=Path,
@@ -26,7 +33,7 @@ parser.add_argument("--result-path",
                     help="The path to the directory to store the results")
 parser.add_argument("--kg-access-method",
                     choices=["memory", "memory-numerical", "hybrid", "sparql"],
-                    default="mem",
+                    default="memory-numerical",
                     help="The method used to access the knowledge graph")
 parser.add_argument("--prefix",
                     type=str,
@@ -38,24 +45,47 @@ parser.add_argument("--max-body-length",
 parser.add_argument("--ontology-valid",
                     action="store_true",
                     help="Set this option if ontology is valid. This will skip the validation step")
-parser.add_argument("--mine-neagitive-rules",
+parser.add_argument("--example-set-size",
+                    type=int,
+                    default=20,
+                    help="The size of the example set used during rule mining")
+parser.add_argument("--mine-negative-rules",
                     action="store_true",
                     help="Set this option if negative rules should be mined")
 
-def create_graph(args) -> Graph:
-    match args.kg_access_method:
+def create_graph(arguments) -> Graph:
+    match arguments.kg_access_method:
         case "memory":
-
-            pass
+            return MemoryKG(arguments.kg_path, arguments.prefix)
         case "memory-numerical":
-
-            pass
+            return None
         case "hybrid":
-            pass
+            return None
         case "sparql":
-            pass
+            return None
+    raise ValueError("Invalid argument for --kg-access-method")
+
+
 
 if __name__ == '__main__':
-    args = parser.parse_args()
-    startTime = time.time()
-    graph = create_graph(args)
+    arguments = parser.parse_args()
+    start_time = time.time()
+    graph = create_graph(arguments)
+    # SHACL validation
+    validation_result_dir = arguments.result_path / "validation_results"
+    validation_result_dir.mkdir(exist_ok=True)
+    shacl_validation(arguments.kg_access_method, arguments.constraint_path.parent, arguments.kg_path, arguments.sparql_access_url, validation_result_dir)
+
+    # Negative Example Generation
+    validation_report_path = validation_result_dir / "validationReport.ttl"
+    negative_triples = generate_negative_triples(graph, validation_report_path, arguments.constraint_path)
+    graph.add_negative_triples(negative_triples)
+    # Ontology parsing
+    ontology = parse_ontology(arguments.ontology_path, arguments.prefix)
+
+    rules = mine_rules(knowledge_graph=graph, ontology=ontology, set_size=arguments.example_set_size, max_depth=arguments.max_body_length, alpha=0.5, mine_negative=arguments.mine_negative_rules)
+
+    print("Total time: ", time.time() - start_time)
+
+    for rule in rules:
+        print(rule)

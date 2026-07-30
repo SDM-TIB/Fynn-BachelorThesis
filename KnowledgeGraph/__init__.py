@@ -1,3 +1,3 @@
-from KnowledgeGraph import Graph
-from KnowledgeGraph import MemoryKG
-from KnowledgeGraph import NumericalKG
+from .Graph import Graph
+from .MemoryKG import MemoryKG
+from .NumericalKG import NumericalKG
