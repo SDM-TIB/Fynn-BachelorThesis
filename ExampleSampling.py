@@ -28,8 +28,7 @@ def get_negative_examples(knowledge_graph: Graph, predicate, ontology: Ontology,
             return examples
 
     if len(examples) < set_size:
-        print(
-            f"{len(examples)} examples found from constraint violations, selecting remaining {set_size - len(examples)} examples from graph.\n")
+        print(f"{len(examples)} examples found from constraint violations, selecting remaining {set_size - len(examples)} examples from graph.\n")
         examples.update(get_LCWA_negative_examples(knowledge_graph, predicate, ontology, set_size - len(examples), type_predicate))
 
     if len(examples) < set_size:

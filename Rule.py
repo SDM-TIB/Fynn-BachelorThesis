@@ -1,5 +1,3 @@
-from typing import Any
-
 VariableID = int
 
 class Rule:
@@ -36,3 +34,19 @@ class Rule:
                 return counts[head_s] >= 4
             return True
         return False
+
+    def get_as_tsv(self, resolve_to_uri) -> str:
+        head_s = self.head[0]
+        head_p = resolve_to_uri(self.head[1])
+        head_o = self.head[2]
+        body_string = ""
+        for s, p, o in self.body:
+            triple_string = f"  v{s}  {resolve_to_uri(p)}  v{o}"
+            body_string += triple_string
+        return f"v{head_s}\t{head_p}\tv{head_o}\t{body_string}"
+
+def get_as_tsv(rules: list[Rule], resolve_to_uri):
+    lines = ["Head Subject\tHead Predicate\tHead Object\tBody"]
+    for rule in rules:
+        lines.append(rule.get_as_tsv(resolve_to_uri))
+    return "\n".join(lines)

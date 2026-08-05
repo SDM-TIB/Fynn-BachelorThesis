@@ -1,13 +1,13 @@
 import os
 from collections import defaultdict
-from typing import Optional
 
 from KnowledgeGraph.Graph import Graph
-from Utility import clean_uri
+from Utility import clean_uri, restore_uri
 
 
 class MemoryKG(Graph):
     def __init__(self, path, prefix):
+        self.prefix = prefix
         self._out = defaultdict(set[tuple[str, str]])
         self._in = defaultdict(set[tuple[str, str]])
         self._pred = defaultdict(set[tuple[str, str]])
@@ -22,9 +22,9 @@ class MemoryKG(Graph):
         self._objects: set[str] = set()
 
         if path:
-            self._parse_file(path, prefix)
+            self._parse_file(path)
 
-    def _parse_file(self, path: str, prefix: Optional[str]):
+    def _parse_file(self, path: str):
         """Parses standard N-Triples (.nt) files into the graph indices."""
         if not os.path.exists(path):
             raise FileNotFoundError(f"Knowledge graph file not found: {path}")
@@ -40,9 +40,9 @@ class MemoryKG(Graph):
                 if len(parts) < 3:
                     continue
 
-                s = clean_uri(parts[0], prefix)
-                p = clean_uri(parts[1], prefix)
-                o = clean_uri(parts[2], prefix)
+                s = clean_uri(parts[0], self.prefix)
+                p = clean_uri(parts[1], self.prefix)
+                o = clean_uri(parts[2], self.prefix)
 
                 self._add_triple_raw(s, p, o)
 
@@ -54,6 +54,9 @@ class MemoryKG(Graph):
         self._subjects.add(s)
         self._predicates.add(p)
         self._objects.add(o)
+
+    def resolve_to_uri(self, node):
+        return restore_uri(node, self.prefix)
 
     # region All
     def get_all_subjects(self):
@@ -106,6 +109,11 @@ class MemoryKG(Graph):
                 all_triples.add((s, p, o))
         return all_triples
 
+    def get_adjacent_triples(self, node):
+        outgoing = {(node, p, o) for p, o in self._out.get(node, set())}
+        incoming = {(s, p, node) for p, s in self._in.get(node, set())}
+        return outgoing | incoming
+
     def get_edges(self, predicate) -> set[tuple[str, str]]:
         return self._pred.get(predicate, set())
 
@@ -119,8 +127,19 @@ class MemoryKG(Graph):
         return self._negative_pred.get(predicate, set())
     #endregion
 
+    # region Literals
     def is_literal(self, object):
         return object.startswith('"')
+
+    def is_valid_comp(self, node):
+        pass
+
+    def literal_type(self, ):
+        pass
+
+    def is_literal_comp(p):
+        pass
+    # endregion
 
     # Modification
     def remove_triples(self, triples):
@@ -145,3 +164,4 @@ class MemoryKG(Graph):
         for s, p, o in triples:
             self._negative_triples.add((s, p, o))
             self._negative_pred[p].add((s, o))
+        self.remove_triples(triples)

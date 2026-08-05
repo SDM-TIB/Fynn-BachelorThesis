@@ -1,13 +1,8 @@
 from rdflib import Graph, RDF, RDFS, OWL
 from rdflib.plugins.parsers.notation3 import BadSyntax
 
+from Utility import clean_uri
 
-def remove_prefix(uri: str, prefix: str = None) -> str:
-    """Utility helper to strip prefixes or URI brackets."""
-    token = str(uri).strip("<> ")
-    if prefix and token.startswith(prefix):
-        return token[len(prefix):]
-    return token.split('/')[-1].split('#')[-1]
 
 class Ontology:
     def __init__(self, classes=None, properties=None):
@@ -15,17 +10,17 @@ class Ontology:
         self.properties = properties if properties is not None else dict()
 
     def add_class(self, prefix: str, c: str, super_class: str = ""):
-        classname = remove_prefix(c, prefix)
+        classname = clean_uri(c, prefix)
         if classname not in self.classes:
             self.classes[classname] = set()
         if super_class:
-            super_name = remove_prefix(super_class, prefix)
+            super_name = clean_uri(super_class, prefix)
             self.classes[classname].add(super_name)
 
     def add_property(self, prefix: str, p: str, d=None, r=None):
-        p_name = remove_prefix(p, prefix)
-        domains = {remove_prefix(x, prefix) for x in d} if d else set()
-        ranges = {remove_prefix(x, prefix) for x in r} if r else set()
+        p_name = clean_uri(p, prefix)
+        domains = {clean_uri(x, prefix) for x in d} if d else set()
+        ranges = {clean_uri(x, prefix) for x in r} if r else set()
 
         if p_name not in self.properties:
             self.properties[p_name] = (domains, ranges)
@@ -48,13 +43,14 @@ class Ontology:
         return visited
 
     def fits_domain_range(self, triple, kg, type_predicate, check_domain=True, check_range=True):
+        #TODO: Add support for literals and literal comparisons
         """
-                Validates if a given triple (s, p, o) satisfies the ontology domain and range constraints.
-                If domain/range are unspecified in the ontology for predicate p, it passes by default.
-                """
+        Validates if a given triple (s, p, o) satisfies the ontology domain and range constraints.
+        If domain/range are unspecified in the ontology for predicate p, it passes by default.
+        """
         subject, predicate, obj = triple
 
-        p_name = remove_prefix(predicate)
+        p_name = clean_uri(predicate)
         if p_name not in self.properties:
             return True
 
@@ -91,7 +87,7 @@ class Ontology:
         types = set()
         type_triples = kg.get_triples(subject=entity, predicate=type_predicate)
         for _, _, t in type_triples:
-            types.add(remove_prefix(t))
+            types.add(clean_uri(t))
         return types
 
 

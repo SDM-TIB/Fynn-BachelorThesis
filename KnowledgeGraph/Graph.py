@@ -1,6 +1,10 @@
 from abc import ABC, abstractmethod
 
 class Graph(ABC):
+    @abstractmethod
+    def resolve_to_uri(self, node):
+        pass
+
     # region All
     @abstractmethod
     def get_all_subjects(self):
@@ -23,6 +27,10 @@ class Graph(ABC):
         pass
 
     @abstractmethod
+    def get_adjacent_triples(self, node):
+        pass
+
+    @abstractmethod
     def get_edges(self, predicate):
         pass
 
@@ -39,9 +47,22 @@ class Graph(ABC):
         pass
     #endregion
 
+    #region Literals
     @abstractmethod
     def is_literal(self, object):
         pass
+
+    @abstractmethod
+    def is_valid_comp(self, node):
+        pass
+    @abstractmethod
+    def literal_type(self, ):
+        pass
+
+    @abstractmethod
+    def is_literal_comp(p):
+        pass
+    #endregion
 
     # Modification
     @abstractmethod

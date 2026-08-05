@@ -3,6 +3,8 @@ import re
 from rdflib import URIRef, RDF, SH, Graph
 
 from KnowledgeGraph.Graph import Graph as KG
+from Utility import clean_uri
+
 
 class TriplePattern:
     def __init__(self, predicate: URIRef, object_value: URIRef, in_filter: bool = False, is_not_exists: bool = False):
@@ -16,11 +18,11 @@ class TriplePattern:
     def __repr__(self):
         return f"({self.predicate}, {self.object}, {'NOT ' if self.is_not_exists else ''}FILTER)" if self.in_filter else f"({self.predicate}, {self.object})"
 
-def generate_negative_triples(graph: KG, report_path, constraint_path) -> set[tuple[URIRef, URIRef, URIRef]]:
+def generate_negative_triples(graph: KG, report_path, constraint_path) -> set[tuple[str, str, str]]:
     constraint_patterns = process_shacl_shapes(constraint_path)
     violations = process_validation_report(report_path)
 
-    negative_triples: set[tuple[URIRef, URIRef, URIRef]] = set()
+    negative_triples: set[tuple[str, str, str]] = set()
     for subject_uri, shape_uri in violations:
         subject = URIRef(subject_uri)
         patterns = constraint_patterns.get(shape_uri)
@@ -36,10 +38,12 @@ def generate_negative_triples(graph: KG, report_path, constraint_path) -> set[tu
                 break
 
         if matches_conditions:
-            for s, p, o in graph.get_triples((subject, None, None)):
+            for s, p, o in graph.get_triples(clean_uri(str(subject))):
                 #TODO: Check what to do about blank nodes
                 for pattern in filter_patterns:
-                    if p == pattern.predicate and (pattern.object is None or pattern.object == o):
+                    predicate = clean_uri(str(pattern.predicate))
+                    object = clean_uri(str(pattern.object)) if pattern.object else None
+                    if p == predicate and (object is None or object == o):
                         negative_triples.add((s, p, o))
 
     return negative_triples
@@ -119,7 +123,7 @@ def process_shacl_shapes(shacl_file: str) -> dict[str, list[TriplePattern]]:
         shacl_file (str): Path to the SHACL Turtle file to be processed.
 
     Returns:
-        Dict[str, List[TriplePattern]]: A dictionary mapping SHACL NodeShapes to lists
+        dict[str, list[TriplePattern]]: A dictionary mapping SHACL NodeShapes to lists
         of extracted SPARQL triple patterns.
     """
 
@@ -199,9 +203,8 @@ def check_pattern_match(graph: KG, subject: URIRef, pattern: TriplePattern) -> b
             if the pattern fails to match and `is_not_exists` is True. Otherwise,
             returns False.
     """
-
-    if pattern.object is None:
-        matches = any(True for _ in graph.get_triples((subject, pattern.predicate, None)))
-        return not matches if pattern.is_not_exists else matches
-    matches = any(obj == pattern.object for _, _, obj in graph.get_triples((subject, pattern.predicate, None)))
-    return not matches if pattern.is_not_exists else matches
+    subject = clean_uri(str(subject))
+    predicate = clean_uri(str(pattern.predicate))
+    object = clean_uri(str(pattern.object)) if pattern.object else None
+    has_match = bool(graph.get_triples(subject, predicate, object))
+    return not has_match if pattern.is_not_exists else has_match

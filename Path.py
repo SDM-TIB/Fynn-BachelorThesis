@@ -41,14 +41,9 @@ class Path:
         return None
 
     def to_rule_closed_rule(self) -> Rule:
-        from Rule import Rule
-        entity_to_var: dict[Entity, int] = {}
-        
-        entity_to_var[self.head[0]] = 0
-        entity_to_var[self.head[2]] = 1
-        
+        entity_to_var: dict[Entity, int] = {self.head[0]: 0, self.head[2]: 1}
         next_var = 2
-        
+
         def get_var(entity: Entity) -> int:
             nonlocal next_var
             if entity not in entity_to_var:
@@ -61,7 +56,6 @@ class Path:
             body_vars.add((get_var(s), p, get_var(o)))
         
         head_vars = (entity_to_var[self.head[0]], self.head[1], entity_to_var[self.head[2]])
-        
         return Rule(body_vars, head_vars)
 
     def __repr__(self):
