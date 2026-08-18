@@ -1,12 +1,13 @@
 import argparse
 import time
-
+from unittest import case
 from KnowledgeGraph import NumericalKG
 from KnowledgeGraph.Graph import Graph
 from pathlib import Path
+from KnowledgeGraph.HybridKG import HybridKG
 from KnowledgeGraph.SPARQLKG import SPARQLKG
 from Ontology import parse_ontology
-from Rule import get_as_tsv
+from Rule import get_as_tsv, get_as_csv, get_for_analysis
 from RuleMining import mine_rules
 from NegativeExampleGeneration import generate_negative_triples
 from KnowledgeGraph.MemoryKG import MemoryKG
@@ -56,9 +57,11 @@ parser.add_argument("--example-set-size",
 parser.add_argument("--overwrite",
                     action="store_true",
                     help="Set this option to overwrite existing files.")
-parser.add_argument("--write-output",
-                    action="store_true",
-                    help="Set this option to write the results to a file in --result_path")
+parser.add_argument("--output-as",
+                    type=str,
+                    choices=["csv", "tsv", "ana"],
+                    default="csv",
+                    help="Set this option to write the results in the specified file format to a file in --result_path")
 parser.add_argument("--multiprocess",
                     action="store_true",
                     help="Set this option if you want to use multiprocessing")
@@ -73,7 +76,7 @@ def create_graph(arguments) -> Graph:
         case "memory-numerical":
             return NumericalKG(arguments.kg_path, arguments.prefix)
         case "hybrid":
-            return None
+            return HybridKG(arguments.sparql_access_url, arguments.prefix)
         case "sparql":
             return SPARQLKG(arguments.sparql_access_url)
     raise ValueError("Invalid argument for --kg-access-method")
@@ -81,8 +84,6 @@ def create_graph(arguments) -> Graph:
 if __name__ == '__main__':
     arguments = parser.parse_args()
     start_time = time.time()
-    graph = create_graph(arguments)
-    print("Graph created in: ", time.time() - start_time)
 
     # SHACL validation
     start_validation = time.time()
@@ -91,6 +92,10 @@ if __name__ == '__main__':
     shacl_validation(arguments.kg_access_method, arguments.constraint_path.parent, arguments.kg_path, arguments.sparql_access_url, validation_result_dir)
     print("SHACL validation took: ", time.time() - start_validation)
 
+    start_graph = time.time()
+    graph = create_graph(arguments)
+    print("Graph created in: ", time.time() - start_graph)
+
     # Negative Example Generation
     negative_example_generation_start_time = time.time()
     validation_report_path = validation_result_dir / "validationReport.ttl"
@@ -98,15 +103,25 @@ if __name__ == '__main__':
     print(f"Generated {len(negative_triples)} negative triples in: ", time.time() - negative_example_generation_start_time)
     graph.add_negative_triples(negative_triples)
 
-    # Ontology parsing
-    ontology = parse_ontology(arguments.ontology_path, arguments.prefix)
+    ontology = parse_ontology(arguments.ontology_path)
 
+    start_rule_mining = time.time()
     rules = mine_rules(knowledge_graph=graph, ontology=ontology, set_size=arguments.example_set_size, max_depth=arguments.max_body_length, alpha=0.5, multiprocessing=arguments.multiprocess, mine_negative=arguments.mine_negative_rules)
 
+    print("Mined rules in: ", time.time() - start_rule_mining)
     print("Total time: ", time.time() - start_time)
 
     for rule in rules:
         print(rule)
-    if arguments.write_output:
-        with open(arguments.result_path / f"{arguments.kg_name}.tsv", mode='w', newline='', encoding='utf-8') as file:
-            file.write(get_as_tsv(rules, graph.resolve_to_uri))
+    match arguments.output_as:
+        case "csv":
+            with open(arguments.result_path / f"{arguments.kg_name}.csv", mode='w', newline='', encoding='utf-8') as file:
+                file.write(get_as_csv(rules, graph.resolve_to_uri))
+        case "tsv":
+            with open(arguments.result_path / f"{arguments.kg_name}.tsv", mode='w', newline='', encoding='utf-8') as file:
+                file.write(get_as_tsv(rules, graph.resolve_to_uri))
+        case "ana":
+            with open(arguments.result_path / f"{arguments.kg_name}.csv", mode='w', newline='', encoding='utf-8') as file:
+                file.write(get_for_analysis(rules,arguments.kg_name , arguments.kg_access_method, start_rule_mining))
+        case _:
+            raise ValueError("Invalid argument for --output-as")

@@ -115,7 +115,7 @@ def mine_rules_for_target_predicate(g: set[tuple], v: set[tuple], predicate, kno
             rule_weight_dict = {}
             r_out_cov_v_cardinality = [None]
             r_out_uncov_v = [None]
-            print(f"\n\nFOUND RULE {r} with {min_weight}\n\n")
+            print(f"\nFOUND RULE {r} with {min_weight}\n")
 
         else:
             if fits_max_depth(r, max_depth):
@@ -218,7 +218,7 @@ def expand_path_closed_rule(rule_dict: dict, path: Path, knowledge_graph: Graph,
         if ontology.fits_domain_range(triple, knowledge_graph, type_predicate, check_domain=is_subject, check_range=not is_subject):
             new_path = path.copy()
             new_path.body.add(triple)
-            rule = new_path.to_rule_closed_rule()
+            rule = new_path.to_rule_closed_rule(knowledge_graph.resolve_to_uri)
 
             if rule in rule_dict:
                 rule_dict[rule].add(new_path)

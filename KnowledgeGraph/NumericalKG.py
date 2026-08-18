@@ -2,7 +2,6 @@ import os
 from collections import defaultdict
 
 from KnowledgeGraph.Graph import Graph
-from Utility import clean_uri, restore_uri
 
 
 class NumericalKG(Graph):
@@ -10,9 +9,11 @@ class NumericalKG(Graph):
         self.mapping_id_str = defaultdict()
         self.mapping_str_id = defaultdict()
 
+        self._prefix = prefix
         self._out = defaultdict(set[tuple[int, int]])
         self._in = defaultdict(set[tuple[int, int]])
         self._pred = defaultdict(set[tuple[int, int]])
+        self._type = defaultdict(set)
 
         # Negative triple stores
         self._negative_triples: set[tuple[int, int, int]] = set()
@@ -24,9 +25,9 @@ class NumericalKG(Graph):
         self._objects: set[int] = set()
 
         if path:
-            self._parse_file(path, prefix)
+            self._parse_file(path)
 
-    def _parse_file(self, path, prefix):
+    def _parse_file(self, path):
         """Parses standard N-Triples (.nt) files into the graph indices."""
         if not os.path.exists(path):
             raise FileNotFoundError(f"Knowledge graph file not found: {path}")
@@ -43,9 +44,14 @@ class NumericalKG(Graph):
                 if len(parts) < 3:
                     continue
 
-                s = clean_uri(parts[0], prefix)
-                p = clean_uri(parts[1], prefix)
-                o = clean_uri(parts[2], prefix)
+                if parts[1].strip("<> \n\r\t") == 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type':
+                    print(self.clean_uri(parts[0]), self.clean_uri(parts[2]))
+                    self._type[self.clean_uri(parts[0])].add(self.clean_uri(parts[2]))
+                    continue
+
+                s = self.clean_uri(parts[0])
+                p = self.clean_uri(parts[1])
+                o = self.clean_uri(parts[2])
 
                 next_id, next_literal_id = self._add_triple_raw(s, p, o, next_id, next_literal_id)
 
@@ -86,8 +92,16 @@ class NumericalKG(Graph):
     def _is_literal(self, object):
         return object.startswith('"')
 
+    def clean_uri(self, uri):
+        if uri is None:
+            return None
+        token = uri.strip("<> \n\r\t")
+        if self.prefix and token.startswith(self.prefix):
+            return token[len(self.prefix):]
+        return token
+
     def resolve_to_uri(self, node):
-        return restore_uri(self.mapping_id_str.get(node))
+        return f"<{self._prefix}{self.mapping_id_str[node]}>"
 
     # region All
     def get_all_subjects(self):
@@ -99,14 +113,12 @@ class NumericalKG(Graph):
     def get_all_objects(self):
         return self._objects
 
-    def get_all_negative_triples(self):
-        return self._negative_triples
     #endregion
 
     # region Specific
     def get_triples(self, subject = None, predicate = None, object = None):
         if subject is not None and predicate is not None and object is not None:
-            if (object, predicate) in self._out.get(subject, set()):
+            if (predicate, object) in self._out.get(subject, set()):
                 return {(subject, predicate, object)} if (predicate, object) in self._out.get(subject, set()) else set()
             return set()
 
@@ -139,6 +151,9 @@ class NumericalKG(Graph):
             for s, o in pairs:
                 all_triples.add((s, p, o))
         return all_triples
+
+    def get_type(self, subject, type_predicate):
+        return self._type[self.clean_uri(subject)]
 
     def get_adjacent_triples(self, node):
         outgoing = {(node, p, o) for p, o in self._out.get(node, set())}

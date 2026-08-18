@@ -37,3 +37,11 @@ def shacl_validation(kg_access_method, constraint_path, kg_path, sparql_access_u
         output_dir=output_dir
     )
     shape_schema.validate()
+
+    #Releasing does not seem to actually show up on memray output
+    del shape_schema
+    if isinstance(knowledge_graph, Graph):
+        knowledge_graph.close()
+        del knowledge_graph
+    import gc
+    gc.collect()

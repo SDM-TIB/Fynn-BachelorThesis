@@ -1,26 +1,33 @@
 from rdflib import Graph, RDF, RDFS, OWL
+from KnowledgeGraph.Graph import Graph as KG
 from rdflib.plugins.parsers.notation3 import BadSyntax
+from abc import ABC, abstractmethod
 
-from Utility import clean_uri
-
+class GenericOntology(ABC):
+    @abstractmethod
+    def fits_domain_range(self, triple, kg, type_predicate, check_domain=True, check_range=True):
+        pass
 
 class Ontology:
     def __init__(self, classes=None, properties=None):
         self.classes = classes if classes is not None else dict()
         self.properties = properties if properties is not None else dict()
 
-    def add_class(self, prefix: str, c: str, super_class: str = ""):
-        classname = clean_uri(c, prefix)
+    def get_name(self, node):
+        return str(node).split('/')[-1].split('#')[-1]
+
+    def add_class(self, c: str, super_class: str = ""):
+        classname = c
         if classname not in self.classes:
             self.classes[classname] = set()
         if super_class:
-            super_name = clean_uri(super_class, prefix)
+            super_name = super_class
             self.classes[classname].add(super_name)
 
-    def add_property(self, prefix: str, p: str, d=None, r=None):
-        p_name = clean_uri(p, prefix)
-        domains = {clean_uri(x, prefix) for x in d} if d else set()
-        ranges = {clean_uri(x, prefix) for x in r} if r else set()
+    def add_property(self, p: str, d=None, r=None):
+        p_name = p
+        domains = {x for x in d} if d else set()
+        ranges = {x for x in r} if r else set()
 
         if p_name not in self.properties:
             self.properties[p_name] = (domains, ranges)
@@ -49,8 +56,7 @@ class Ontology:
         If domain/range are unspecified in the ontology for predicate p, it passes by default.
         """
         subject, predicate, obj = triple
-
-        p_name = clean_uri(predicate)
+        p_name = self.get_name(predicate)
         if p_name not in self.properties:
             return True
 
@@ -82,16 +88,17 @@ class Ontology:
 
         return True
 
-    def _get_entity_types(self, entity: str, kg, type_predicate: str) -> set[str]:
+    def _get_entity_types(self, entity: str, kg: KG, type_predicate: str) -> set[str]:
         """Queries knowledge graph for all type classes associated with an entity."""
         types = set()
-        type_triples = kg.get_triples(subject=entity, predicate=type_predicate)
-        for _, _, t in type_triples:
-            types.add(clean_uri(t))
+        entity = kg.clean_uri(entity)
+        type_triples = kg.get_type(entity, type_predicate)
+        for t in type_triples:
+            types.add(self.get_name(t))
         return types
 
 
-def parse_ontology(ontology_file: str, prefix: str = "") -> Ontology:
+def parse_ontology(ontology_file: str) -> Ontology:
     """Parses a Turtle (.ttl) ontology file using RDFLib into an Ontology object."""
     g = Graph()
     try:
@@ -106,17 +113,17 @@ def parse_ontology(ontology_file: str, prefix: str = "") -> Ontology:
         return str(node).split('/')[-1].split('#')[-1]
 
     for c in g.subjects(RDF.type, OWL.Class):
-        ontology.add_class(prefix, get_name(c))
+        ontology.add_class(get_name(c))
     for c in g.subjects(RDF.type, RDFS.Class):
-        ontology.add_class(prefix, get_name(c))
+        ontology.add_class(get_name(c))
 
     for sub, sup in g.subject_objects(RDFS.subClassOf):
-        ontology.add_class(prefix, get_name(sub), get_name(sup))
+        ontology.add_class(get_name(sub), get_name(sup))
 
     for p_type in [OWL.ObjectProperty, OWL.DatatypeProperty, RDF.Property]:
         for p in g.subjects(RDF.type, p_type):
             domains = {get_name(d) for d in g.objects(p, RDFS.domain)}
             ranges = {get_name(r) for r in g.objects(p, RDFS.range)}
-            ontology.add_property(prefix, get_name(p), domains, ranges)
+            ontology.add_property(get_name(p), domains, ranges)
 
     return ontology

@@ -19,7 +19,7 @@ class Path:
             nodes.add(o)
         return nodes
 
-    def frontiers_closed_rule(self) -> Entity:
+    def frontiers_closed_rule(self) -> Entity | None:
         h1 = self.head[0]
         nodes = self.get_nodes()
         if not self.body or (len(nodes) == 1 and h1 in nodes):
@@ -40,7 +40,7 @@ class Path:
         
         return None
 
-    def to_rule_closed_rule(self) -> Rule:
+    def to_rule_closed_rule(self, resolve_to_uri) -> Rule:
         entity_to_var: dict[Entity, int] = {self.head[0]: 0, self.head[2]: 1}
         next_var = 2
 
@@ -56,7 +56,7 @@ class Path:
             body_vars.add((get_var(s), p, get_var(o)))
         
         head_vars = (entity_to_var[self.head[0]], self.head[1], entity_to_var[self.head[2]])
-        return Rule(body_vars, head_vars)
+        return Rule(body_vars, head_vars, resolve_to_uri)
 
     def __repr__(self):
         return f"Path(head={self.head}, body={self.body})"

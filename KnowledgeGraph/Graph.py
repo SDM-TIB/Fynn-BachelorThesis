@@ -2,6 +2,10 @@ from abc import ABC, abstractmethod
 
 class Graph(ABC):
     @abstractmethod
+    def clean_uri(self, uri):
+        pass
+
+    @abstractmethod
     def resolve_to_uri(self, node):
         pass
 
@@ -16,14 +20,15 @@ class Graph(ABC):
     def get_all_objects(self):
         pass
 
-    @abstractmethod
-    def get_all_negative_triples(self):
-        pass
     #endregion
 
     # region Specific
     @abstractmethod
     def get_triples(self, subject = None, predicate = None, object = None):
+        pass
+
+    @abstractmethod
+    def get_type(self, subject, type_predicate):
         pass
 
     @abstractmethod
@@ -65,10 +70,6 @@ class Graph(ABC):
     #endregion
 
     # Modification
-    @abstractmethod
-    def remove_triples(self, triples):
-        pass
-
     @abstractmethod
     def add_negative_triples(self, triples):
         pass

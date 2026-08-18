@@ -2,7 +2,6 @@ import os
 from collections import defaultdict
 
 from KnowledgeGraph.Graph import Graph
-from Utility import clean_uri, restore_uri
 
 
 class MemoryKG(Graph):
@@ -11,6 +10,7 @@ class MemoryKG(Graph):
         self._out = defaultdict(set[tuple[str, str]])
         self._in = defaultdict(set[tuple[str, str]])
         self._pred = defaultdict(set[tuple[str, str]])
+        self._type = defaultdict(set)
 
         # Negative triple stores
         self._negative_triples: set[tuple[str, str, str]] = set()
@@ -40,9 +40,13 @@ class MemoryKG(Graph):
                 if len(parts) < 3:
                     continue
 
-                s = clean_uri(parts[0], self.prefix)
-                p = clean_uri(parts[1], self.prefix)
-                o = clean_uri(parts[2], self.prefix)
+                if parts[1].strip("<> \n\r\t") == 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type':
+                    print(self.clean_uri(parts[0]), self.clean_uri(parts[2]))
+                    self._type[self.clean_uri(parts[0])].add(self.clean_uri(parts[2]))
+                    continue
+                s = self.clean_uri(parts[0])
+                p = self.clean_uri(parts[1])
+                o = self.clean_uri(parts[2])
 
                 self._add_triple_raw(s, p, o)
 
@@ -55,8 +59,16 @@ class MemoryKG(Graph):
         self._predicates.add(p)
         self._objects.add(o)
 
+    def clean_uri(self, uri):
+        if uri is None:
+            return None
+        token = uri.strip("<> \n\r\t")
+        if self.prefix and token.startswith(self.prefix):
+            return token[len(self.prefix):]
+        return token
+
     def resolve_to_uri(self, node):
-        return restore_uri(node, self.prefix)
+        return f"<{self.prefix}{node}>"
 
     # region All
     def get_all_subjects(self):
@@ -68,14 +80,12 @@ class MemoryKG(Graph):
     def get_all_objects(self):
         return self._objects
 
-    def get_all_negative_triples(self):
-        return self._negative_triples
     #endregion
 
     # region Specific
     def get_triples(self, subject = None, predicate = None, object = None):
         if subject is not None and predicate is not None and object is not None:
-            if (object, predicate) in self._out.get(subject, set()):
+            if (predicate, object) in self._out.get(subject, set()):
                 return {(subject, predicate, object)} if (predicate, object) in self._out.get(subject, set()) else set()
             return set()
 
@@ -108,6 +118,9 @@ class MemoryKG(Graph):
             for s, o in pairs:
                 all_triples.add((s, p, o))
         return all_triples
+
+    def get_type(self, subject, type_predicate):
+        return self._type[self.clean_uri(subject)]
 
     def get_adjacent_triples(self, node):
         outgoing = {(node, p, o) for p, o in self._out.get(node, set())}

@@ -1,13 +1,17 @@
+import time
+
 VariableID = int
 
 class Rule:
-    def __init__(self, body: set[tuple[VariableID, str | int, VariableID]], head: tuple[VariableID, str |int, VariableID]):
+    def __init__(self, body: set[tuple[VariableID, str | int, VariableID]], head: tuple[VariableID, str |int, VariableID], resolve_to_uri):
         self.body = body
         self.head = head
+        self.resolve_to_uri = resolve_to_uri
+        self.time = time.time()
 
     def __repr__(self) -> str:
-        body_str = ", ".join([f"{p}(v{s}, v{o})" for s, p, o in self.body])
-        return f"{self.head[1]}(v{self.head[0]}, v{self.head[2]}) :- {body_str}"
+        body_str = ", ".join([f"{self.resolve_to_uri(p)}(v{s}, v{o})" for s, p, o in self.body])
+        return f"{self.resolve_to_uri(self.head[1])}(v{self.head[0]}, v{self.head[2]}) :- {body_str}"
 
     def __hash__(self) -> int:
         return hash((frozenset(self.body), self.head))
@@ -35,7 +39,7 @@ class Rule:
             return True
         return False
 
-    def get_as_tsv(self, resolve_to_uri) -> str:
+    def get_as_string(self, resolve_to_uri, seperator: str) -> str:
         head_s = self.head[0]
         head_p = resolve_to_uri(self.head[1])
         head_o = self.head[2]
@@ -43,10 +47,24 @@ class Rule:
         for s, p, o in self.body:
             triple_string = f"  v{s}  {resolve_to_uri(p)}  v{o}"
             body_string += triple_string
-        return f"v{head_s}\t{head_p}\tv{head_o}\t{body_string}"
+        return f"v{head_s}{seperator}{head_p}{seperator}v{head_o}{seperator}{body_string}"
 
 def get_as_tsv(rules: list[Rule], resolve_to_uri):
     lines = ["Head Subject\tHead Predicate\tHead Object\tBody"]
     for rule in rules:
-        lines.append(rule.get_as_tsv(resolve_to_uri))
+        lines.append(rule.get_as_string(resolve_to_uri, seperator="\t"))
+    return "\n".join(lines)
+
+def get_as_csv(rules: list[Rule], resolve_to_uri):
+    lines = ["Head Subject,Head Predicate,Head Object,Body"]
+    for rule in rules:
+        lines.append(rule.get_as_string(resolve_to_uri, seperator=","))
+    return "\n".join(lines)
+
+def get_for_analysis(rules: list[Rule], kg_name, approach, start_time):
+    lines = ["test,approach,answer,time"]
+    i = 1
+    for rule in rules:
+        lines.append(f"{kg_name},{approach},{i},{rule.time-start_time}")
+        i += 1
     return "\n".join(lines)
