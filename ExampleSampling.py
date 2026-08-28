@@ -28,7 +28,7 @@ def get_negative_examples(knowledge_graph: Graph, predicate, ontology: Ontology,
             return examples
 
     if len(examples) < set_size:
-        print(f"{len(examples)} examples found from constraint violations\n")
+        # print(f"{len(examples)} examples found from constraint violations\n")
         examples.update(get_LCWA_negative_examples(knowledge_graph, predicate, ontology, set_size - len(examples), type_predicate))
 
     # Not using random negative examples is probably better in terms of rule quality and runtime since random negative examples
@@ -41,7 +41,7 @@ def get_negative_examples(knowledge_graph: Graph, predicate, ontology: Ontology,
 
 def get_LCWA_negative_examples(knowledge_graph, predicate, ontology, count: int, type_predicate, max_attempts=None) -> set[tuple]:
     out = set()
-
+    rng = random.Random(302032093874)
     forbidden_edges = set()
     subjects = set()
     objects = set()
@@ -58,8 +58,8 @@ def get_LCWA_negative_examples(knowledge_graph, predicate, ontology, count: int,
     attempts = 0
 
     while len(out) < count and attempts < max_attempts and subjects and objects:
-        subject = random.choice(subjects_list)
-        object = random.choice(objects_list)
+        subject = rng.choice(subjects_list)
+        object = rng.choice(objects_list)
         pair = (subject, object)
         attempts += 1
 

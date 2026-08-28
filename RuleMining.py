@@ -1,7 +1,6 @@
-from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing as mp
 import numpy as np
-
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from ExampleSampling import get_examples, get_negative_examples
 from KnowledgeGraph.Graph import Graph
 from Ontology import Ontology
@@ -17,33 +16,29 @@ def init_worker(kg, ontology):
     _GLOBAL_KG = kg
     _GLOBAL_ONTOLOGY = ontology
 
-def mine_rules(knowledge_graph: Graph, ontology: Ontology, set_size: int, max_depth: int, alpha: float, multiprocessing, type_predicate:str='http://www.w3.org/1999/02/22-rdf-syntax-ns#type', mine_negative=False) -> list[Rule]:
+def mine_rules(knowledge_graph: Graph, ontology: Ontology, set_size: int, max_depth: int, alpha: float, multiprocessing, workers, type_predicate:str='http://www.w3.org/1999/02/22-rdf-syntax-ns#type', mine_negative=False) -> list[Rule]:
     if alpha > 1.0 or alpha < 0.0:
         raise ValueError("alpha must be in [0,1].")
     beta = 1 - alpha
     print(f"Computed beta as {beta}.\n")
-    init_worker(knowledge_graph, ontology)
-    expand_fun = expand_path_closed_rule
-    fits_max_depth = fits_max_depth_closed_rule
-
     rules = []
+    predicates = knowledge_graph.get_all_predicates()
+    init_worker(knowledge_graph, ontology)
     if multiprocessing:
         context = mp.get_context("fork")
-        with ProcessPoolExecutor(mp_context=context) as executor:
+        with ProcessPoolExecutor(mp_context=context, max_workers=workers) as executor:
             futures = [
                 executor.submit(
-                    process_target,
-                    predicate,
+                    process_batch_targets,
+                    batch,
                     set_size,
                     type_predicate,
-                    expand_fun,
-                    fits_max_depth,
                     max_depth,
                     alpha,
                     beta,
                     mine_negative
                 )
-                for predicate in knowledge_graph.get_all_predicates()
+                for batch in knowledge_graph.get_balanced_predicate_batches() if batch
             ]
 
             for f in as_completed(futures):
@@ -51,25 +46,31 @@ def mine_rules(knowledge_graph: Graph, ontology: Ontology, set_size: int, max_de
                 if result:
                     rules.extend(result)
     else:
-        for predicate in knowledge_graph.get_all_predicates():
-            rules.extend(process_target(predicate, set_size, type_predicate, expand_fun, fits_max_depth, max_depth, alpha, beta, mine_negative))
+        for predicate in predicates:
+            rules.extend(process_target(predicate, set_size, type_predicate, max_depth, alpha, beta, mine_negative))
 
     return rules
 
-def process_target(predicate, set_size, type_predicate, expand_fun, fits_max_depth, max_depth, alpha, beta, mine_negative):
-    print(f"creating input sets G and V for target predicate <{predicate}>...\n")
+def process_batch_targets(predicates, set_size, type_predicate, max_depth, alpha, beta, mine_negative):
+    batch = []
+    for predicate in predicates:
+        batch.extend(process_target(predicate, set_size, type_predicate, max_depth, alpha, beta, mine_negative))
+    return batch
+
+def process_target(predicate, set_size, type_predicate, max_depth, alpha, beta, mine_negative):
+    # print(f"creating input sets G and V for target predicate <{predicate}>...\n")
     knowledge_graph = _GLOBAL_KG
     ontology = _GLOBAL_ONTOLOGY
     g = get_examples(knowledge_graph, predicate, set_size, ontology, type_predicate)
     len_g = len(g)
-    if len_g < set_size:
-        print(f"There aren't enough positive examples in the graph, proceeding with {len_g} examples.\n")
+    # if len_g < set_size:
+        # print(f"There aren't enough positive examples in the graph, proceeding with {len_g} examples.\n")
 
     v = get_negative_examples(knowledge_graph, predicate, ontology, set_size, type_predicate)
 
     len_v = len(v)
-    if len_v < set_size:
-        print(f"There aren't enough negative examples in the graph, proceeding with {len_v} examples.\n")
+    # if len_v < set_size:
+        # print(f"There aren't enough negative examples in the graph, proceeding with {len_v} examples.\n")
 
     #TODO: Add warnings back
     if not g:
@@ -79,12 +80,11 @@ def process_target(predicate, set_size, type_predicate, expand_fun, fits_max_dep
         # warnings.warn(f"There are no validation examples for . No rule-mining possible \n", UserWarning)
         return []
 
-    print(f"mining rules for target predicate <{predicate}>...\n")
+    # print(f"mining rules for target predicate <{predicate}>...\n")
 
-    return mine_rules_for_target_predicate(g, v, predicate, knowledge_graph, type_predicate, ontology, expand_fun,
-                                           fits_max_depth, max_depth, alpha, beta, mine_negative)
+    return mine_rules_for_target_predicate(g, v, predicate, knowledge_graph, type_predicate, ontology, max_depth, alpha, beta, mine_negative)
 
-def mine_rules_for_target_predicate(g: set[tuple], v: set[tuple], predicate, knowledge_graph: Graph, type_predicate: str, ontology: Ontology, expand_fun, fits_max_depth, max_depth: int = 3, alpha: float = 0.5, beta: float = 0.5, mine_negative: bool = False):
+def mine_rules_for_target_predicate(g: set[tuple], v: set[tuple], predicate, knowledge_graph: Graph, type_predicate: str, ontology: Ontology, max_depth: int = 3, alpha: float = 0.5, beta: float = 0.5, mine_negative: bool = False):
     # TODO when expanding, excluding bad paths better?
     # TODO when finding r, mind rules with same weight, collect all and look through those until a rule is found
 
@@ -99,10 +99,38 @@ def mine_rules_for_target_predicate(g: set[tuple], v: set[tuple], predicate, kno
 
     # TODO call expand rule here, duplicate code
 
+    # if isinstance(knowledge_graph, SPARQLKG) or isinstance(knowledge_graph, HybridKG):
+    #     with ThreadPoolExecutor() as executor:
+    #         futures = [
+    #             executor.submit(
+    #                 expand_path_closed_rule,
+    #             rule_dict,
+    #                 path,
+    #                 knowledge_graph,
+    #                 ontology,
+    #                 type_predicate
+    #             )
+    #             for path in paths
+    #         ]
+    #         for f in as_completed(futures):
+    #             rule_dict_to_add = f.result()
+    #             for rule, new_paths in rule_dict_to_add.items():
+    #                 if rule in rule_dict:
+    #                     rule_dict[rule].update(new_paths)
+    #                 else:
+    #                     rule_dict[rule] = new_paths
+    # else:
     for path in paths:
-        expand_fun(rule_dict, path, knowledge_graph, ontology, type_predicate)
+        rule_dict_to_add = expand_path_closed_rule(rule_dict, path, knowledge_graph, ontology, type_predicate)
+        for rule, new_paths in rule_dict_to_add.items():
+            if rule in rule_dict:
+                rule_dict[rule].update(new_paths)
+            else:
+                rule_dict[rule] = new_paths
+    # Batched approach seems to only be faster for SPARQL and only if run as a single process possibly add as an option.
+    # knowledge_graph.expand_paths(rule_dict, paths, ontology, type_predicate)
 
-    r, min_weight = find_r(r_out_dict, r_out_cov_v_cardinality, r_out_uncov_v, rule_dict, rule_weight_dict, knowledge_graph, g, v, alpha, beta, fits_max_depth, max_depth)
+    r, min_weight = find_r(r_out_dict, r_out_cov_v_cardinality, r_out_uncov_v, rule_dict, rule_weight_dict, knowledge_graph, g, v, alpha, beta, max_depth)
     r_out_cov_g_set = set()
 
     while True:
@@ -115,25 +143,30 @@ def mine_rules_for_target_predicate(g: set[tuple], v: set[tuple], predicate, kno
             rule_weight_dict = {}
             r_out_cov_v_cardinality = [None]
             r_out_uncov_v = [None]
-            print(f"\nFOUND RULE {r} with {min_weight}\n")
+            # print(f"\nFOUND RULE {r} with {min_weight}\n")
 
         else:
-            if fits_max_depth(r, max_depth):
-                expand_rule(r, rule_dict, knowledge_graph, ontology, type_predicate, expand_fun)
+            if fits_max_depth_closed_rule(r, max_depth):
+                expand_rule(r, rule_dict, knowledge_graph, ontology, type_predicate)
             rule_dict.pop(r)
 
         r, min_weight = find_r(r_out_dict, r_out_cov_v_cardinality, r_out_uncov_v, rule_dict, rule_weight_dict, knowledge_graph, g,
-                               v, alpha, beta, fits_max_depth, max_depth)
+                               v, alpha, beta, max_depth)
 
     return r_out_dict
 
-def expand_rule(rule, rule_dict, knowledge_graph, ontology, type_predicate, expand_fun):
+def expand_rule(rule, rule_dict, knowledge_graph, ontology, type_predicate):
     if rule in rule_dict:
         paths = list(rule_dict[rule])
         for path in paths:
-            expand_fun(rule_dict, path, knowledge_graph, ontology, type_predicate)
+            rule_dict_to_add = expand_path_closed_rule(rule_dict, path, knowledge_graph, ontology, type_predicate)
+            for rule, new_paths in rule_dict_to_add.items():
+                if rule in rule_dict:
+                    rule_dict[rule].update(new_paths)
+                else:
+                    rule_dict[rule] = new_paths
 
-def find_r(R_out_dict:dict, R_out_cov_v_cardinality:list, R_out_uncov_v:list, rule_dict:dict, rule_weight_dict:dict, knowledge_graph: Graph, g:set, v:set, alpha:float, beta:float, fits_max_depth, max_depth:int):
+def find_r(R_out_dict:dict, R_out_cov_v_cardinality:list, R_out_uncov_v:list, rule_dict:dict, rule_weight_dict:dict, knowledge_graph: Graph, g:set, v:set, alpha:float, beta:float, max_depth:int):
 
     min_weight = np.inf
     best_rule = None
@@ -168,7 +201,7 @@ def find_r(R_out_dict:dict, R_out_cov_v_cardinality:list, R_out_uncov_v:list, ru
             rule_weight_dict[rule] = weight
 
         is_valid = rule.is_valid()
-        if not fits_max_depth(rule, max_depth) and (weight >= 0 or not is_valid):
+        if not fits_max_depth_closed_rule(rule, max_depth) and (weight >= 0 or not is_valid):
             rules_to_remove.add(rule)
             continue
 
@@ -190,18 +223,18 @@ def expand_path_closed_rule(rule_dict: dict, path: Path, knowledge_graph: Graph,
     frontier = path.frontiers_closed_rule()
 
     if frontier is None:
-        print(f"no frontier for {path}")
-        return
+        # print(f"no frontier for {path}")
+        return {}
 
     if knowledge_graph.is_literal(frontier):
         # TODO include literal comparisons as connection
-        return
+        return {}
 
     path_body = path.body
     path_head = path.head
     nodes = path.get_nodes()
-    adjacent_triples = knowledge_graph.get_adjacent_triples(frontier)
-    for s, p, o in adjacent_triples:
+    rule_dict_to_add = {}
+    for s, p, o in knowledge_graph.get_adjacent_triples(frontier):
         if p == type_predicate:
             continue
 
@@ -220,8 +253,8 @@ def expand_path_closed_rule(rule_dict: dict, path: Path, knowledge_graph: Graph,
             new_path.body.add(triple)
             rule = new_path.to_rule_closed_rule(knowledge_graph.resolve_to_uri)
 
-            if rule in rule_dict:
-                rule_dict[rule].add(new_path)
+            if rule in rule_dict_to_add:
+                rule_dict_to_add[rule].add(new_path)
             else:
-                rule_dict[rule] = {new_path}
-    return
+                rule_dict_to_add[rule] = {new_path}
+    return rule_dict_to_add

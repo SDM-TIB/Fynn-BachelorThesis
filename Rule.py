@@ -61,10 +61,11 @@ def get_as_csv(rules: list[Rule], resolve_to_uri):
         lines.append(rule.get_as_string(resolve_to_uri, seperator=","))
     return "\n".join(lines)
 
-def get_for_analysis(rules: list[Rule], kg_name, approach, start_time):
+def get_for_analysis(rules: list[Rule], kg_name, approach, multiprocess: bool, start_time):
     lines = ["test,approach,answer,time"]
     i = 1
+    rules.sort(key=lambda rule: rule.time)
     for rule in rules:
-        lines.append(f"{kg_name},{approach},{i},{rule.time-start_time}")
+        lines.append(f"{kg_name},{approach}{"_MP" if multiprocess else ""},{i},{rule.time-start_time}")
         i += 1
     return "\n".join(lines)

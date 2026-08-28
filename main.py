@@ -1,6 +1,5 @@
 import argparse
 import time
-from unittest import case
 from KnowledgeGraph import NumericalKG
 from KnowledgeGraph.Graph import Graph
 from pathlib import Path
@@ -12,8 +11,16 @@ from RuleMining import mine_rules
 from NegativeExampleGeneration import generate_negative_triples
 from KnowledgeGraph.MemoryKG import MemoryKG
 from Validation import shacl_validation
+from viztracer import VizTracer
 
-parser = argparse.ArgumentParser(description="")
+# tracer = VizTracer(
+#     output_file="result.json",
+#     min_duration=0.001,
+#     max_stack_depth=10,
+#     pid_suffix=True,
+# )
+
+parser = argparse.ArgumentParser(description="Mines rules from a knowledge graph while being constraint and ontology aware.")
 
 parser.add_argument("--kg-name",
                     required=True,
@@ -42,7 +49,7 @@ parser.add_argument("--kg-access-method",
                     help="The method used to access the knowledge graph")
 parser.add_argument("--prefix",
                     type=str,
-                    help="The most common prefix used in the knowledge graph for example 'http://example.com/'\nThis is only relevant if --kg-access-method is 'memory' since it has no effect on the other approaches")
+                    help="The most common prefix used in the knowledge graph for example 'http://example.com/'\nThis is only relevant if --kg-access-method is 'memory' or 'memory-numerical' since it has no effect on the other approaches")
 parser.add_argument("--max-body-length",
                     type=int,
                     default=3,
@@ -65,6 +72,10 @@ parser.add_argument("--output-as",
 parser.add_argument("--multiprocess",
                     action="store_true",
                     help="Set this option if you want to use multiprocessing")
+parser.add_argument("--workers",
+                    type=int,
+                    default=10,
+                    help="Number of worker processes to use. Only used if --multiprocess is set")
 parser.add_argument("--mine-negative-rules",
                     action="store_true",
                     help="Set this option if negative rules should be mined")
@@ -104,13 +115,15 @@ if __name__ == '__main__':
     graph.add_negative_triples(negative_triples)
 
     ontology = parse_ontology(arguments.ontology_path)
-
+    graph.freeze(multiprocess=arguments.multiprocess, workers=arguments.workers)
+    # tracer.start()
     start_rule_mining = time.time()
-    rules = mine_rules(knowledge_graph=graph, ontology=ontology, set_size=arguments.example_set_size, max_depth=arguments.max_body_length, alpha=0.5, multiprocessing=arguments.multiprocess, mine_negative=arguments.mine_negative_rules)
+    rules = mine_rules(knowledge_graph=graph, ontology=ontology, set_size=arguments.example_set_size, max_depth=arguments.max_body_length, alpha=0.5, multiprocessing=arguments.multiprocess, workers=arguments.workers, mine_negative=arguments.mine_negative_rules)
 
     print("Mined rules in: ", time.time() - start_rule_mining)
     print("Total time: ", time.time() - start_time)
-
+    # tracer.stop()
+    # tracer.save()
     for rule in rules:
         print(rule)
     match arguments.output_as:
@@ -121,7 +134,7 @@ if __name__ == '__main__':
             with open(arguments.result_path / f"{arguments.kg_name}.tsv", mode='w', newline='', encoding='utf-8') as file:
                 file.write(get_as_tsv(rules, graph.resolve_to_uri))
         case "ana":
-            with open(arguments.result_path / f"{arguments.kg_name}.csv", mode='w', newline='', encoding='utf-8') as file:
-                file.write(get_for_analysis(rules,arguments.kg_name , arguments.kg_access_method, start_rule_mining))
+            with open(arguments.result_path / f"{arguments.kg_name}_{arguments.kg_access_method}{"_MP" if arguments.multiprocess else ""}.csv", mode='w', newline='', encoding='utf-8') as file:
+                file.write(get_for_analysis(rules,arguments.kg_name , arguments.kg_access_method, arguments.multiprocess, start_rule_mining))
         case _:
             raise ValueError("Invalid argument for --output-as")

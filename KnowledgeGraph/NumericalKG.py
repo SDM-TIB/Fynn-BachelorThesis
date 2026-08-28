@@ -1,28 +1,35 @@
 import os
+import immutables
 from collections import defaultdict
-
 from KnowledgeGraph.Graph import Graph
-
+from Utility import get_triples_from
 
 class NumericalKG(Graph):
     def __init__(self, path, prefix):
+        self._prefix = prefix
+        self._is_frozen = False
+
         self.mapping_id_str = defaultdict()
         self.mapping_str_id = defaultdict()
 
-        self._prefix = prefix
-        self._out = defaultdict(set[tuple[int, int]])
-        self._in = defaultdict(set[tuple[int, int]])
-        self._pred = defaultdict(set[tuple[int, int]])
-        self._type = defaultdict(set)
+        # Mutable for KG creation
+        self._out_mutable = defaultdict(set[tuple[int, int]])
+        self._in_mutable = defaultdict(set[tuple[int, int]])
+        self._pred_mutable = defaultdict(set[tuple[int, int]])
+        self._type_mutable = defaultdict(set)
+        self._negative_triples_mutable: set[tuple[int, int, int]] = set()
+        self._negative_pred_mutable = defaultdict(set)
+        self._predicates_mutable: set[int] = set()
 
-        # Negative triple stores
-        self._negative_triples: set[tuple[int, int, int]] = set()
-        self._negative_pred = defaultdict(set)
-
-        # Entity/Predicate tracking sets
-        self._subjects: set[int] = set()
-        self._predicates: set[int] = set()
-        self._objects: set[int] = set()
+        # Immutable versions for rule mining
+        self._out = immutables.Map()
+        self._in = immutables.Map()
+        self._pred = immutables.Map()
+        self._type = immutables.Map()
+        self._negative_pred = immutables.Map()
+        self._negative_triples: tuple[tuple[int, int, int]] = tuple()
+        self._predicates: tuple[int] = tuple()
+        self._predicate_batches: tuple[tuple[int]] = tuple()
 
         if path:
             self._parse_file(path)
@@ -45,8 +52,7 @@ class NumericalKG(Graph):
                     continue
 
                 if parts[1].strip("<> \n\r\t") == 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type':
-                    print(self.clean_uri(parts[0]), self.clean_uri(parts[2]))
-                    self._type[self.clean_uri(parts[0])].add(self.clean_uri(parts[2]))
+                    self._type_mutable[self.clean_uri(parts[0])].add(self.clean_uri(parts[2]))
                     continue
 
                 s = self.clean_uri(parts[0])
@@ -80,85 +86,83 @@ class NumericalKG(Graph):
         else:
             o_num = add_mapping(o)
 
-        self._out[s_num].add((p_num, o_num))
-        self._in[o_num].add((p_num, s_num))
-        self._pred[p_num].add((s_num, o_num))
+        self._out_mutable[s_num].add((p_num, o_num))
+        self._in_mutable[o_num].add((p_num, s_num))
+        self._pred_mutable[p_num].add((s_num, o_num))
 
-        self._subjects.add(s_num)
-        self._predicates.add(p_num)
-        self._objects.add(o_num)
+        self._predicates_mutable.add(p_num)
         return next_id, next_literal_id
 
     def _is_literal(self, object):
         return object.startswith('"')
 
-    def clean_uri(self, uri):
-        if uri is None:
-            return None
+    def freeze(self, multiprocess: bool, workers: int):
+        if self._is_frozen:
+            return
+
+        self._out = immutables.Map(
+            {subject: tuple(pairs) for subject, pairs in self._out_mutable.items()}
+        )
+        self._in = immutables.Map(
+            {object: tuple(pairs) for object, pairs in self._in_mutable.items()}
+        )
+        self._pred = immutables.Map(
+            {predicate: tuple(pairs) for predicate, pairs in self._pred_mutable.items()}
+        )
+        self._type = immutables.Map(
+            {node: tuple(pairs) for node, pairs in self._type_mutable.items()}
+        )
+        self._negative_pred = immutables.Map(
+            {predicate: tuple(pairs) for predicate, pairs in self._negative_pred_mutable.items()}
+        )
+        self._negative_triples = tuple(self._negative_triples_mutable)
+        if multiprocess:
+            self._predicate_batches = super()._generate_predicate_batches(self._predicates_mutable, workers)
+        else:
+            self._predicates = tuple(self._predicates_mutable)
+
+        del self._out_mutable
+        del self._in_mutable
+        del self._pred_mutable
+        del self._type_mutable
+        del self._negative_pred_mutable
+        del self._negative_triples_mutable
+        del self._predicates_mutable
+        del self.mapping_str_id
+
+        self._is_frozen = True
+
+    def clean_uri(self, uri) -> str:
         token = uri.strip("<> \n\r\t")
-        if self.prefix and token.startswith(self.prefix):
-            return token[len(self.prefix):]
+        if self._prefix and token.startswith(self._prefix):
+            return token[len(self._prefix):]
         return token
 
     def resolve_to_uri(self, node):
-        return f"<{self._prefix}{self.mapping_id_str[node]}>"
+        return f"{self._prefix}{self.mapping_id_str[node]}"
 
-    # region All
-    def get_all_subjects(self):
-        return self._subjects
-
+    # region Predicates
     def get_all_predicates(self):
         return self._predicates
 
-    def get_all_objects(self):
-        return self._objects
-
+    def get_balanced_predicate_batches(self):
+        return self._predicate_batches
     #endregion
 
     # region Specific
     def get_triples(self, subject = None, predicate = None, object = None):
-        if subject is not None and predicate is not None and object is not None:
-            if (predicate, object) in self._out.get(subject, set()):
-                return {(subject, predicate, object)} if (predicate, object) in self._out.get(subject, set()) else set()
-            return set()
-
-        if subject is not None:
-            pairs = self._out.get(subject, set())
-            return {
-                (subject, p, o)
-                for p, o in pairs
-                if (predicate is None or p == predicate) and (object is None or o == object)
-            }
-
-        if object is not None:
-            pairs = self._in.get(object, set())
-            return {
-                (s, p, object)
-                for p, s in pairs
-                if (predicate is None or p == predicate) and (subject is None or s == subject)
-            }
-
-        if predicate is not None:
-            pairs = self._pred.get(predicate, set())
-            return {
-                (s, predicate, o)
-                for s, o in pairs
-                if (subject is None or s == subject) and (object is None or o == object)
-            }
-
-        all_triples = set()
-        for p, pairs in self._pred.items():
-            for s, o in pairs:
-                all_triples.add((s, p, o))
-        return all_triples
+        if not self._is_frozen:
+            return get_triples_from(subject, predicate, object, self._in_mutable, self._out_mutable, self._pred_mutable)
+        return get_triples_from(subject, predicate, object, self._in, self._out, self._pred)
 
     def get_type(self, subject, type_predicate):
-        return self._type[self.clean_uri(subject)]
+        return self._type.get(subject, ())
 
     def get_adjacent_triples(self, node):
-        outgoing = {(node, p, o) for p, o in self._out.get(node, set())}
-        incoming = {(s, p, node) for p, s in self._in.get(node, set())}
-        return outgoing | incoming
+        for p, o in self._out.get(node, ()):
+            yield node, p, o
+        for p, s in self._in.get(node, ()):
+            yield s, p, node
 
     def get_edges(self, predicate) -> set[tuple[int, int]]:
         return self._pred.get(predicate, set())
@@ -180,7 +184,7 @@ class NumericalKG(Graph):
     def is_valid_comp(self, node):
         pass
 
-    def literal_type(self, ):
+    def literal_type(self, node):
         pass
 
     def is_literal_comp(p):
@@ -189,30 +193,30 @@ class NumericalKG(Graph):
 
     # Modification
     def remove_triples(self, triples):
+        if self._is_frozen:
+            raise RuntimeError("Cannot remove triples from frozen KnowledgeGraph")
         for s, p, o in triples:
             s = self.mapping_str_id.get(s)
             p = self.mapping_str_id.get(p)
             o = self.mapping_str_id.get(o)
-            self._out[s].discard((p, o))
-            self._in[o].discard((p, s))
-            self._pred[p].discard((s, o))
+            self._out_mutable[s].discard((p, o))
+            self._in_mutable[o].discard((p, s))
+            self._pred_mutable[p].discard((s, o))
 
-            if not self._out[s]:
-                del self._out[s]
-                self._subjects.discard(s)
+            if not self._out_mutable[s]:
+                del self._out_mutable[s]
 
-            if not self._in[o]:
-                del self._in[o]
-                self._objects.discard(o)
+            if not self._in_mutable[o]:
+                del self._in_mutable[o]
 
-            if not self._pred[p]:
-                del self._pred[p]
-                self._predicates.discard(p)
+            if not self._pred_mutable[p]:
+                del self._pred_mutable[p]
+                self._predicates_mutable.discard(p)
 
     def add_negative_triples(self, triples):
         for s, p, o in triples:
             s_num = self.mapping_str_id.get(s)
             o_num = self.mapping_str_id.get(o)
             p_num = self.mapping_str_id.get(p)
-            self._negative_triples.add((s_num, p_num, o_num))
-            self._negative_pred[p_num].add((s_num, o_num))
+            self._negative_triples_mutable.add((s_num, p_num, o_num))
+            self._negative_pred_mutable[p_num].add((s_num, o_num))

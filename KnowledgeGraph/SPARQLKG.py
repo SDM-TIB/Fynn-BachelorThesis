@@ -12,6 +12,7 @@ class SPARQLKG(KG):
         self._graph = Graph(store=self._store)
         self._negative_triples: set[tuple[str, str, str]] = set()
         self._negative_pred = defaultdict(set)
+        self._workers: int = 0
         self._type_filter = """
         FILTER(
             !STRSTARTS(STR(?p), "http://www.w3.org/1999/02/22-rdf-syntax-ns#") &&
@@ -24,26 +25,19 @@ class SPARQLKG(KG):
     def _select(self, query: str) -> list:
         return list(self._graph.query(query))
 
-    def clean_uri(self, uri):
+    def freeze(self, multiprocess: bool, workers: int):
+        self._workers = workers
+
+    def clean_uri(self, uri) -> str:
         if isinstance(uri, Literal):
             return f"\"{str(uri)}\""
         return str(uri)
 
 
     def resolve_to_uri(self, node):
-        #TODO: Implement
         return node
 
-    # region All
-    def get_all_subjects(self):
-        query = (f"""
-        SELECT DISTINCT ?s WHERE {{
-            ?s ?p ?o .
-            {self._type_filter}
-        }}
-        """)
-        return {row[0] for row in self._select(query)}
-
+    # region Predicates
     def get_all_predicates(self):
         query = (f"""
         SELECT DISTINCT ?p WHERE {{
@@ -51,29 +45,31 @@ class SPARQLKG(KG):
             {self._type_filter}
         }}
         """)
-        return {row[0] for row in self._select(query)}
+        return { self.clean_uri(row[0]) for row in self._select(query)}
 
-    def get_all_objects(self):
-        # query = "SELECT DISTINCT ?o WHERE { ?s ?p ?o }"
-        query = (f"""
-        SELECT DISTINCT ?o WHERE {{
+    def get_balanced_predicate_batches(self):
+        query = f"""
+        SELECT DISTINCT ?p (COUNT(*) AS ?count) WHERE {{
             ?s ?p ?o .
             {self._type_filter}
-        }}
-        """)
-        return {row[0] for row in self._select(query)}
+        }} GROUP BY ?p
+        """
+        predicate_counts = [(self.clean_uri(row[0]), int(row[1])) for row in self._select(query)]
+        predicate_counts.sort(key=lambda x: x[1], reverse=True)
 
+        batches = [[] for _ in range(self._workers)]
+        batch_sizes = [0 for _ in range(self._workers)]
+
+        for predicate, count in predicate_counts:
+            batch_min_weight_index = batch_sizes.index(min(batch_sizes))
+            batches[batch_min_weight_index].append(predicate)
+            batch_sizes[batch_min_weight_index] += count
+        return tuple(tuple(batch) for batch in batches)
     #endregion
 
     # region Specific
     #TODO: Check input data types
     def get_triples(self, subject = None, predicate = None, object = None):
-        # s_node = self._to_node(subject)
-        # p_node = self._to_node(predicate)
-        # o_node = self._to_node(object)
-        # triples = set(self._graph.triples((s_node, p_node, o_node)))
-        # triples = {triple for triple in triples if str(triple[1]) != RDF_TYPE_URI}
-        # return triples
         s_node = f"<{subject}>" if subject else "?s"
         p_node = f"<{predicate}>" if predicate else "?p"
         if object is None:
@@ -96,10 +92,17 @@ class SPARQLKG(KG):
             {self._type_filter}
         }}
         """
-        return self._select(query)
+        results = { (self.clean_uri(s), self.clean_uri(p), self.clean_uri(o)) for s, p, o in self._select(query) }
+        if not self._negative_triples:
+            return results
+
+        if predicate and predicate in self._negative_pred:
+            negative_pairs = self._negative_pred.get(predicate, set())
+            return { triple for triple in results if (triple[0], triple[2]) not in negative_pairs }
+
+        return results - self._negative_triples
 
     def get_type(self, subject, type_predicate):
-        # print(subject, type_predicate)
         if self.is_literal(subject):
             return list()
         s_node = f"<{subject}>"
@@ -116,23 +119,11 @@ class SPARQLKG(KG):
             {self._type_filter}
         }}
         """
-        return self._select(query)
+        return { (self.clean_uri(s), self.clean_uri(p), self.clean_uri(o)) for s, p, o in self._select(query) } - self._negative_triples
 
     def get_edges(self, predicate):
         query = f"SELECT DISTINCT ?s ?o WHERE {{ ?s <{predicate}> ?o }}"
-        return {(row[0], row[1]) for row in self._select(query)}
-
-    def get_objects(self, predicate):
-        query = f"SELECT DISTINCT ?o WHERE {{ ?s <{predicate}> ?o }}"
-        return {row[0] for row in self._select(query)}
-
-    def get_predicates(self, subject):
-        query = f"""
-        SELECT DISTINCT ?p WHERE {{
-            <{subject}> ?p ?o .
-            {self._type_filter}
-        }}"""
-        return {row[0] for row in self._select(query)}
+        return {(self.clean_uri(row[0]), self.clean_uri(row[1])) for row in self._select(query)} - self.get_negative_edges(predicate)
 
     def get_negative_edges(self, predicate):
         return self._negative_pred.get(predicate, set())
@@ -140,17 +131,12 @@ class SPARQLKG(KG):
 
     # region Literals
     def is_literal(self, object):
-        # print(isinstance(object, str))
-        # return isinstance(object, Literal)
-        # print(object)
-        # print(object.startswith('http://'))
-        # return not object.startswith('http://')
         return object.startswith('"')
 
     def is_valid_comp(self, node):
         pass
 
-    def literal_type(self, ):
+    def literal_type(self, node):
         pass
 
     def is_literal_comp(p):
@@ -162,6 +148,9 @@ class SPARQLKG(KG):
         pass
 
     def add_negative_triples(self, triples):
-        for triple in triples:
-            self._negative_triples.add(triple)
-            self._negative_pred[triple[1]].add((triple[0], triple[2]))
+        for s, p, o in triples:
+            s_clean = self.clean_uri(s)
+            p_clean = self.clean_uri(p)
+            o_clean = self.clean_uri(o)
+            self._negative_triples.add((s_clean, p_clean, o_clean))
+            self._negative_pred[p_clean].add((s_clean, o_clean))

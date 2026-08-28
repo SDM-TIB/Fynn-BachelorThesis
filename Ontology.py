@@ -1,12 +1,6 @@
 from rdflib import Graph, RDF, RDFS, OWL
 from KnowledgeGraph.Graph import Graph as KG
 from rdflib.plugins.parsers.notation3 import BadSyntax
-from abc import ABC, abstractmethod
-
-class GenericOntology(ABC):
-    @abstractmethod
-    def fits_domain_range(self, triple, kg, type_predicate, check_domain=True, check_range=True):
-        pass
 
 class Ontology:
     def __init__(self, classes=None, properties=None):
@@ -14,7 +8,7 @@ class Ontology:
         self.properties = properties if properties is not None else dict()
 
     def get_name(self, node):
-        return str(node).split('/')[-1].split('#')[-1]
+        return str(node).strip("<>").split('/')[-1].split('#')[-1]
 
     def add_class(self, c: str, super_class: str = ""):
         classname = c
@@ -49,13 +43,15 @@ class Ontology:
 
         return visited
 
-    def fits_domain_range(self, triple, kg, type_predicate, check_domain=True, check_range=True):
+    def fits_domain_range(self, triple, kg: KG, type_predicate, check_domain=True, check_range=True):
         #TODO: Add support for literals and literal comparisons
         """
         Validates if a given triple (s, p, o) satisfies the ontology domain and range constraints.
         If domain/range are unspecified in the ontology for predicate p, it passes by default.
         """
-        subject, predicate, obj = triple
+        subject = kg.resolve_to_uri(triple[0])
+        predicate = kg.resolve_to_uri(triple[1])
+        obj = kg.resolve_to_uri(triple[2])
         p_name = self.get_name(predicate)
         if p_name not in self.properties:
             return True
