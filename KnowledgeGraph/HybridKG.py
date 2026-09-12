@@ -2,9 +2,9 @@ from diskcache import Cache
 from KnowledgeGraph import Graph, SPARQLKG
 
 class HybridKG(Graph):
-    def __init__(self, url, prefix: str):
+    def __init__(self, url, prefix: str, multiprocess: bool, workers: int):
         self._prefix = prefix
-        self._sparql = SPARQLKG(url)
+        self._sparql = SPARQLKG(url, multiprocess, workers)
         self._cache = Cache(cache_dir="./kg_cache")
 
     def freeze(self, multiprocess: bool, workers: int):
@@ -24,7 +24,14 @@ class HybridKG(Graph):
 
     def get_triples(self, subject=None, predicate=None, object=None):
         # No caching because cache hit is unlikely
-        return self._sparql.get_triples(subject, predicate, object)
+        cache_key = f"tr:{self.clean_uri(subject)}{predicate}{object}"
+        cached = self._cache.get(cache_key)
+        if cached:
+            return cached
+        result = self._sparql.get_triples(subject, predicate, object)
+        self._cache.set(cache_key, result)
+        return result
+        # return self._sparql.get_triples(subject, predicate, object)
 
     def get_type(self, subject, type_predicate):
         cache_key = f"t:{self.clean_uri(subject)}"
@@ -59,8 +66,8 @@ class HybridKG(Graph):
     def literal_type(self, node):
         return self._sparql.literal_type(node)
 
-    def is_literal_comp(self):
-        return self._sparql.is_literal_comp()
+    def is_literal_comp(self, predicate):
+        return self._sparql.is_literal_comp(predicate)
 
     def add_negative_triples(self, triples):
         return self._sparql.add_negative_triples(triples)

@@ -87,9 +87,9 @@ def create_graph(arguments) -> Graph:
         case "memory-numerical":
             return NumericalKG(arguments.kg_path, arguments.prefix)
         case "hybrid":
-            return HybridKG(arguments.sparql_access_url, arguments.prefix)
+            return HybridKG(arguments.sparql_access_url, arguments.prefix, arguments.multiprocess, arguments.workers)
         case "sparql":
-            return SPARQLKG(arguments.sparql_access_url)
+            return SPARQLKG(arguments.sparql_access_url, arguments.multiprocess, arguments.workers)
     raise ValueError("Invalid argument for --kg-access-method")
 
 if __name__ == '__main__':
@@ -135,6 +135,6 @@ if __name__ == '__main__':
                 file.write(get_as_tsv(rules, graph.resolve_to_uri))
         case "ana":
             with open(arguments.result_path / f"{arguments.kg_name}_{arguments.kg_access_method}{"_MP" if arguments.multiprocess else ""}.csv", mode='w', newline='', encoding='utf-8') as file:
-                file.write(get_for_analysis(rules,arguments.kg_name , arguments.kg_access_method, arguments.multiprocess, start_rule_mining))
+                file.write(get_for_analysis(rules,arguments.kg_name , arguments.kg_access_method, arguments.multiprocess, start_time))
         case _:
             raise ValueError("Invalid argument for --output-as")

@@ -1,7 +1,10 @@
+import gc
 import multiprocessing as mp
 import numpy as np
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed, ThreadPoolExecutor
 from ExampleSampling import get_examples, get_negative_examples
+from KnowledgeGraph.SPARQLKG import SPARQLKG
+from KnowledgeGraph.HybridKG import HybridKG
 from KnowledgeGraph.Graph import Graph
 from Ontology import Ontology
 from Rule import Rule
@@ -11,7 +14,7 @@ from WeightEstimation import cov_g, est_m_weight, rulelist_coverage, rulelist_un
 _GLOBAL_KG: Graph = None
 _GLOBAL_ONTOLOGY: Ontology = None
 
-def init_worker(kg, ontology):
+def init_state(kg, ontology):
     global _GLOBAL_KG, _GLOBAL_ONTOLOGY
     _GLOBAL_KG = kg
     _GLOBAL_ONTOLOGY = ontology
@@ -23,7 +26,7 @@ def mine_rules(knowledge_graph: Graph, ontology: Ontology, set_size: int, max_de
     print(f"Computed beta as {beta}.\n")
     rules = []
     predicates = knowledge_graph.get_all_predicates()
-    init_worker(knowledge_graph, ontology)
+    init_state(knowledge_graph, ontology)
     if multiprocessing:
         context = mp.get_context("fork")
         with ProcessPoolExecutor(mp_context=context, max_workers=workers) as executor:
@@ -45,6 +48,9 @@ def mine_rules(knowledge_graph: Graph, ontology: Ontology, set_size: int, max_de
                 result = f.result()
                 if result:
                     rules.extend(result)
+                del result
+            futures = None
+            gc.collect()
     else:
         for predicate in predicates:
             rules.extend(process_target(predicate, set_size, type_predicate, max_depth, alpha, beta, mine_negative))
@@ -61,14 +67,17 @@ def process_target(predicate, set_size, type_predicate, max_depth, alpha, beta, 
     # print(f"creating input sets G and V for target predicate <{predicate}>...\n")
     knowledge_graph = _GLOBAL_KG
     ontology = _GLOBAL_ONTOLOGY
-    g = get_examples(knowledge_graph, predicate, set_size, ontology, type_predicate)
-    len_g = len(g)
+    if mine_negative:
+        g = get_negative_examples(knowledge_graph, predicate, ontology, set_size, type_predicate)
+        v = get_examples(knowledge_graph, predicate, set_size, ontology, type_predicate)
+    else:
+        g = get_examples(knowledge_graph, predicate, set_size, ontology, type_predicate)
+        v = get_negative_examples(knowledge_graph, predicate, ontology, set_size, type_predicate)
+    # len_g = len(g)
     # if len_g < set_size:
         # print(f"There aren't enough positive examples in the graph, proceeding with {len_g} examples.\n")
 
-    v = get_negative_examples(knowledge_graph, predicate, ontology, set_size, type_predicate)
-
-    len_v = len(v)
+    # len_v = len(v)
     # if len_v < set_size:
         # print(f"There aren't enough negative examples in the graph, proceeding with {len_v} examples.\n")
 
@@ -87,7 +96,6 @@ def process_target(predicate, set_size, type_predicate, max_depth, alpha, beta, 
 def mine_rules_for_target_predicate(g: set[tuple], v: set[tuple], predicate, knowledge_graph: Graph, type_predicate: str, ontology: Ontology, max_depth: int = 3, alpha: float = 0.5, beta: float = 0.5, mine_negative: bool = False):
     # TODO when expanding, excluding bad paths better?
     # TODO when finding r, mind rules with same weight, collect all and look through those until a rule is found
-
     r_out_dict = {}
     rule_dict = {}
 
@@ -104,7 +112,6 @@ def mine_rules_for_target_predicate(g: set[tuple], v: set[tuple], predicate, kno
     #         futures = [
     #             executor.submit(
     #                 expand_path_closed_rule,
-    #             rule_dict,
     #                 path,
     #                 knowledge_graph,
     #                 ontology,
@@ -121,7 +128,7 @@ def mine_rules_for_target_predicate(g: set[tuple], v: set[tuple], predicate, kno
     #                     rule_dict[rule] = new_paths
     # else:
     for path in paths:
-        rule_dict_to_add = expand_path_closed_rule(rule_dict, path, knowledge_graph, ontology, type_predicate)
+        rule_dict_to_add = expand_path_closed_rule(path, knowledge_graph, ontology, type_predicate)
         for rule, new_paths in rule_dict_to_add.items():
             if rule in rule_dict:
                 rule_dict[rule].update(new_paths)
@@ -159,7 +166,7 @@ def expand_rule(rule, rule_dict, knowledge_graph, ontology, type_predicate):
     if rule in rule_dict:
         paths = list(rule_dict[rule])
         for path in paths:
-            rule_dict_to_add = expand_path_closed_rule(rule_dict, path, knowledge_graph, ontology, type_predicate)
+            rule_dict_to_add = expand_path_closed_rule(path, knowledge_graph, ontology, type_predicate)
             for rule, new_paths in rule_dict_to_add.items():
                 if rule in rule_dict:
                     rule_dict[rule].update(new_paths)
@@ -219,7 +226,7 @@ def fits_max_depth_closed_rule(r:Rule, max_depth):
     return len(r.body) < max_depth
 
 """Expands given path by one from frontiers, creates closed rules"""
-def expand_path_closed_rule(rule_dict: dict, path: Path, knowledge_graph: Graph, ontology: Ontology, type_predicate: str):
+def expand_path_closed_rule(path: Path, knowledge_graph: Graph, ontology: Ontology, type_predicate: str):
     frontier = path.frontiers_closed_rule()
 
     if frontier is None:

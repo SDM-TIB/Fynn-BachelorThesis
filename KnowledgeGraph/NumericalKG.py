@@ -1,3 +1,4 @@
+import gc
 import os
 import immutables
 from collections import defaultdict
@@ -129,7 +130,7 @@ class NumericalKG(Graph):
         del self._negative_triples_mutable
         del self._predicates_mutable
         del self.mapping_str_id
-
+        gc.collect()
         self._is_frozen = True
 
     def clean_uri(self, uri) -> str:
@@ -187,7 +188,7 @@ class NumericalKG(Graph):
     def literal_type(self, node):
         pass
 
-    def is_literal_comp(p):
+    def is_literal_comp(self, predicate):
         pass
     # endregion
 

@@ -1,3 +1,4 @@
+import gc
 import sys
 import immutables
 import os
@@ -98,7 +99,7 @@ class MemoryKG(Graph):
         del self._negative_pred_mutable
         del self._negative_triples_mutable
         del self._predicates_mutable
-
+        gc.collect()
         self._is_frozen = True
 
     def clean_uri(self, uri) -> str:
@@ -162,7 +163,7 @@ class MemoryKG(Graph):
             return type
         return ""
 
-    def is_literal_comp(p):
+    def is_literal_comp(self, predicate):
         pass
     # endregion
 

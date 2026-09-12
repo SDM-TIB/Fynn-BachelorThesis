@@ -1,37 +1,82 @@
+import os
+import immutables
+import urllib3
+import orjson
 from collections import defaultdict
-from rdflib import Literal, Graph, RDF
-from rdflib.plugins.stores.sparqlstore import SPARQLStore
+from rdflib import RDF
 from KnowledgeGraph.Graph import Graph as KG
 
 RDF_TYPE_URI = str(RDF.type)
 
 class SPARQLKG(KG):
-    #TODO: Handle removing triples some way
-    def __init__(self, url):
-        self._store = SPARQLStore(query_endpoint=url)
-        self._graph = Graph(store=self._store)
-        self._negative_triples: set[tuple[str, str, str]] = set()
-        self._negative_pred = defaultdict(set)
-        self._workers: int = 0
+    def __init__(self, url, multiprocess: bool, workers: int):
+        self._endpoint_url = url
+        self._client = None
+        self._client_pid = None
+        self._workers: int = workers
         self._type_filter = """
-        FILTER(
-            !STRSTARTS(STR(?p), "http://www.w3.org/1999/02/22-rdf-syntax-ns#") &&
-            !STRSTARTS(STR(?p), "http://www.w3.org/2000/01/rdf-schema#") &&
-            !STRSTARTS(STR(?p), "http://www.w3.org/2002/07/owl#") &&
-            !STRSTARTS(STR(?p), "http://proton.semanticweb.org/protonsys#")
-        )
-        """
+                FILTER(
+                    !STRSTARTS(STR(?p), "http://www.w3.org/1999/02/22-rdf-syntax-ns#") &&
+                    !STRSTARTS(STR(?p), "http://www.w3.org/2000/01/rdf-schema#") &&
+                    !STRSTARTS(STR(?p), "http://www.w3.org/2002/07/owl#") &&
+                    !STRSTARTS(STR(?p), "http://proton.semanticweb.org/protonsys#")
+                )
+                """
+        # Mutable for initialization
+        self._negative_triples: set[tuple[str, str, str]] = set()
+        self._negative_pred: defaultdict = defaultdict(set)
+        # Immutable for multiprocess compatibility
+        # self._negative_pred = immutables.Map()
+        # self._negative_triples: tuple[tuple[str, str, str]] = tuple()
+
+    @property
+    def client(self):
+        pid = os.getpid()
+
+        if self._client is None or self._client_pid != pid:
+            self._client = urllib3.PoolManager()
+            self._client_pid = pid
+
+        return self._client
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state["_client"] = None
+        state["_client_pid"] = None
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._client = None
+        self._client_pid = None
 
     def _select(self, query: str) -> list:
-        return list(self._graph.query(query))
+        #TODO: Improve error handling
+        response = self.client.request("POST", self._endpoint_url, body=query.encode("utf-8"), headers={"Accept": "application/sparql-results+json", "Content-Type": "application/sparql-query"})
+        if response.status != 200:
+            raise RuntimeError(response.text)
+        data = orjson.loads(response.data)
+        variables = data.get("head", {}).get("vars", [])
+        bindings = data.get("results", {}).get("bindings", {})
+        return [tuple(self.to_internal_format(binding[variable]) for variable in variables if variable in binding) for binding in bindings]
 
     def freeze(self, multiprocess: bool, workers: int):
-        self._workers = workers
+        # self._negative_pred = immutables.Map(
+        #     {predicate: tuple(pairs) for predicate, pairs in self._negative_pred_mutable.items()}
+        # )
+        # self._negative_triples = tuple(self._negative_triples_mutable)
+        #
+        # del self._negative_pred_mutable
+        # del self._negative_triples_mutable
+        pass
+
+    def to_internal_format(self, binding):
+        if binding["type"] == "literal":
+            return f'"{binding["value"]}"^^{binding["datatype"]}'
+        return binding["value"]
 
     def clean_uri(self, uri) -> str:
-        if isinstance(uri, Literal):
-            return f"\"{str(uri)}\""
-        return str(uri)
+        return uri
 
 
     def resolve_to_uri(self, node):
@@ -54,7 +99,7 @@ class SPARQLKG(KG):
             {self._type_filter}
         }} GROUP BY ?p
         """
-        predicate_counts = [(self.clean_uri(row[0]), int(row[1])) for row in self._select(query)]
+        predicate_counts = [(self.clean_uri(row[0]), int(row[1].split('"')[1])) for row in self._select(query)]
         predicate_counts.sort(key=lambda x: x[1], reverse=True)
 
         batches = [[] for _ in range(self._workers)]
@@ -139,7 +184,7 @@ class SPARQLKG(KG):
     def literal_type(self, node):
         pass
 
-    def is_literal_comp(p):
+    def is_literal_comp(self, predicate):
         pass
     # endregion
 
