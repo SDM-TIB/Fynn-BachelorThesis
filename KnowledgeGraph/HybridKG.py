@@ -1,3 +1,5 @@
+from typing import override
+
 from diskcache import Cache
 from KnowledgeGraph import Graph, SPARQLKG
 
@@ -52,7 +54,19 @@ class HybridKG(Graph):
         return result
 
     def get_edges(self, predicate):
-        return self._sparql.get_edges(predicate)
+        cache_key = f"ed:{self.clean_uri(predicate)}"
+        cached = self._cache.get(cache_key)
+        if cached:
+            print("Cache hit")
+            return cached
+        result = self._sparql.get_edges(predicate)
+        self._cache.set(cache_key, result)
+        return result
+        # return self._sparql.get_edges(predicate)
+
+    @override
+    def patterns_in_graph(self, body: set[tuple], name_dict: dict) -> bool:
+        return self._sparql.patterns_in_graph(body, name_dict)
 
     def get_negative_edges(self, predicate):
         return self._sparql.get_negative_edges(predicate)

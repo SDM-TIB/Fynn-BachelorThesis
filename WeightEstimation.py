@@ -69,68 +69,68 @@ def covers_example(rule: Rule, example: tuple, kg: Graph, bound: bool = True) ->
         else:
             name_dict[rule.head[2]] = o_val
 
-    return _patterns_in_graph(rule.body, name_dict, kg)
+    return kg.patterns_in_graph(rule.body, name_dict)
 
 
-def _patterns_in_graph(body: set[tuple], name_dict: dict, kg: Graph) -> bool:
-    """Helper function to check if triple patterns are instantiable in KG."""
-    if not body:
-        return True
-
-    solutions = [name_dict]
-    handled_patterns = set()
-
-    while len(handled_patterns) < len(body):
-        best_pattern = None
-        for pattern in body:
-            if pattern in handled_patterns:
-                continue
-            if pattern[0] in solutions[0] and pattern[2] in solutions[0]:
-                best_pattern = pattern
-                break
-
-        if best_pattern:
-            s_var, p, o_var = best_pattern
-            new_solutions = []
-            for sol in solutions:
-                if bool(kg.get_triples(subject=sol[s_var], predicate=p, object=sol[o_var])):
-                    new_solutions.append(sol)
-            solutions = new_solutions
-            handled_patterns.add(best_pattern)
-        else:
-            for pattern in body:
-                if pattern in handled_patterns:
-                    continue
-                if pattern[0] in solutions[0] or pattern[2] in solutions[0]:
-                    best_pattern = pattern
-                    break
-
-            if not best_pattern:
-                for pattern in body:
-                    if pattern not in handled_patterns:
-                        best_pattern = pattern
-                        break
-
-            if best_pattern:
-                s_var, p, o_var = best_pattern
-                new_solutions = []
-                for sol in solutions:
-                    s_bound = sol.get(s_var)
-                    o_bound = sol.get(o_var)
-
-                    matches = kg.get_triples(subject=s_bound, predicate=p, object=o_bound)
-                    for m_s, m_p, m_o in matches:
-                        new_sol = sol.copy()
-                        new_sol[s_var] = m_s
-                        new_sol[o_var] = m_o
-                        new_solutions.append(new_sol)
-                solutions = new_solutions
-                handled_patterns.add(best_pattern)
-
-        if not solutions:
-            return False
-
-    return True
+# def _patterns_in_graph(body: set[tuple], name_dict: dict, kg: Graph) -> bool:
+#     """Helper function to check if triple patterns are instantiable in KG."""
+#     if not body:
+#         return True
+#
+#     solutions = [name_dict]
+#     handled_patterns = set()
+#
+#     while len(handled_patterns) < len(body):
+#         best_pattern = None
+#         for pattern in body:
+#             if pattern in handled_patterns:
+#                 continue
+#             if pattern[0] in solutions[0] and pattern[2] in solutions[0]:
+#                 best_pattern = pattern
+#                 break
+#
+#         if best_pattern:
+#             s_var, p, o_var = best_pattern
+#             new_solutions = []
+#             for sol in solutions:
+#                 if bool(kg.get_triples(subject=sol[s_var], predicate=p, object=sol[o_var])):
+#                     new_solutions.append(sol)
+#             solutions = new_solutions
+#             handled_patterns.add(best_pattern)
+#         else:
+#             for pattern in body:
+#                 if pattern in handled_patterns:
+#                     continue
+#                 if pattern[0] in solutions[0] or pattern[2] in solutions[0]:
+#                     best_pattern = pattern
+#                     break
+#
+#             if not best_pattern:
+#                 for pattern in body:
+#                     if pattern not in handled_patterns:
+#                         best_pattern = pattern
+#                         break
+#
+#             if best_pattern:
+#                 s_var, p, o_var = best_pattern
+#                 new_solutions = []
+#                 for sol in solutions:
+#                     s_bound = sol.get(s_var)
+#                     o_bound = sol.get(o_var)
+#
+#                     matches = kg.get_triples(subject=s_bound, predicate=p, object=o_bound)
+#                     for m_s, m_p, m_o in matches:
+#                         new_sol = sol.copy()
+#                         new_sol[s_var] = m_s
+#                         new_sol[o_var] = m_o
+#                         new_solutions.append(new_sol)
+#                 solutions = new_solutions
+#                 handled_patterns.add(best_pattern)
+#
+#         if not solutions:
+#             return False
+#
+#     return True
 
 
 """estimated marginal weight"""

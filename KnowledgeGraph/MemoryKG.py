@@ -19,7 +19,7 @@ class MemoryKG(Graph):
         self._pred_mutable = defaultdict(set[tuple[str, str]])
         self._type_mutable = defaultdict(set)
         self._predicates_mutable = set()
-        self._negative_triples_mutable: set[tuple[str, str, str]] = set()
+        # self._negative_triples_mutable: set[tuple[str, str, str]] = set()
         self._negative_pred_mutable = defaultdict(set)
 
         # Immutable versions for rule mining
@@ -28,7 +28,7 @@ class MemoryKG(Graph):
         self._pred = immutables.Map()
         self._type = immutables.Map()
         self._negative_pred = immutables.Map()
-        self._negative_triples: tuple[tuple[str, str, str]] = tuple()
+        # self._negative_triples: tuple[tuple[str, str, str]] = tuple()
         self._predicates: tuple[str] = tuple()
         self._predicate_batches: tuple[tuple[str]] = tuple()
 
@@ -86,7 +86,7 @@ class MemoryKG(Graph):
         self._negative_pred = immutables.Map(
             {predicate: tuple(pairs) for predicate, pairs in self._negative_pred_mutable.items()}
         )
-        self._negative_triples = tuple(self._negative_triples_mutable)
+        # self._negative_triples = tuple(self._negative_triples_mutable)
         if multiprocess:
             self._predicate_batches = super()._generate_predicate_batches(self._predicates_mutable, workers)
         else:
@@ -97,7 +97,7 @@ class MemoryKG(Graph):
         del self._pred_mutable
         del self._type_mutable
         del self._negative_pred_mutable
-        del self._negative_triples_mutable
+        # del self._negative_triples_mutable
         del self._predicates_mutable
         gc.collect()
         self._is_frozen = True
@@ -188,6 +188,6 @@ class MemoryKG(Graph):
         if self._is_frozen:
             raise RuntimeError("Negative triples cannot be added after graph has been frozen.")
         for s, p, o in triples:
-            self._negative_triples_mutable.add((s, p, o))
+            # self._negative_triples_mutable.add((s, p, o))
             self._negative_pred_mutable[p].add((s, o))
         self.remove_triples(triples)

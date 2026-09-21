@@ -67,14 +67,17 @@ def process_target(predicate, set_size, type_predicate, max_depth, alpha, beta, 
     # print(f"creating input sets G and V for target predicate <{predicate}>...\n")
     knowledge_graph = _GLOBAL_KG
     ontology = _GLOBAL_ONTOLOGY
+    edges = knowledge_graph.get_edges(predicate)
     if mine_negative:
-        g = get_negative_examples(knowledge_graph, predicate, ontology, set_size, type_predicate)
-        v = get_examples(knowledge_graph, predicate, set_size, ontology, type_predicate)
+        g = get_negative_examples(knowledge_graph, predicate, edges, ontology, set_size, type_predicate)
+        v = get_examples(knowledge_graph, predicate, edges, set_size, ontology, type_predicate)
     else:
-        g = get_examples(knowledge_graph, predicate, set_size, ontology, type_predicate)
-        v = get_negative_examples(knowledge_graph, predicate, ontology, set_size, type_predicate)
+        g = get_examples(knowledge_graph, predicate, edges, set_size, ontology, type_predicate)
+        v = get_negative_examples(knowledge_graph, predicate, edges, ontology, set_size, type_predicate)
+    edges = []
+    del edges
     # len_g = len(g)
-    # if len_g < set_size:
+    # if len_g < set_size
         # print(f"There aren't enough positive examples in the graph, proceeding with {len_g} examples.\n")
 
     # len_v = len(v)

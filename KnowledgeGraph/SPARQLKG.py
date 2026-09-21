@@ -1,4 +1,6 @@
 import os
+from typing import override
+
 import immutables
 import urllib3
 import orjson
@@ -54,11 +56,26 @@ class SPARQLKG(KG):
         #TODO: Improve error handling
         response = self.client.request("POST", self._endpoint_url, body=query.encode("utf-8"), headers={"Accept": "application/sparql-results+json", "Content-Type": "application/sparql-query"})
         if response.status != 200:
-            raise RuntimeError(response.text)
+            print(f"Query: {query}")
+            print(f"Response: {response}")
+            print(f": {response.status}")
+            raise RuntimeError(response.status)
         data = orjson.loads(response.data)
         variables = data.get("head", {}).get("vars", [])
         bindings = data.get("results", {}).get("bindings", {})
         return [tuple(self.to_internal_format(binding[variable]) for variable in variables if variable in binding) for binding in bindings]
+
+    def _ask(self, query: str) -> bool:
+        response = self.client.request("POST", self._endpoint_url, body=query.encode("utf-8"),
+                                       headers={"Accept": "application/sparql-results+json",
+                                                "Content-Type": "application/sparql-query"})
+        if response.status != 200:
+            print(f"Query: {query}")
+            print(f"Response: {response}")
+            print(f": {response.status}")
+            raise RuntimeError(response.status)
+        data = orjson.loads(response.data)
+        return data["boolean"]
 
     def freeze(self, multiprocess: bool, workers: int):
         # self._negative_pred = immutables.Map(
@@ -72,7 +89,9 @@ class SPARQLKG(KG):
 
     def to_internal_format(self, binding):
         if binding["type"] == "literal":
-            return f'"{binding["value"]}"^^{binding["datatype"]}'
+            if "datatype" in binding:
+                return f'"{binding["value"]}"^^{binding["datatype"]}'
+            return f'"{binding["value"]}"^^{"http://www.w3.org/2001/XMLSchema#string"}'
         return binding["value"]
 
     def clean_uri(self, uri) -> str:
@@ -172,6 +191,47 @@ class SPARQLKG(KG):
 
     def get_negative_edges(self, predicate):
         return self._negative_pred.get(predicate, set())
+
+    def _format_pattern_term(self, term: str, name_dict: dict) -> str:
+        if term in name_dict:
+            return f"<{name_dict[term]}>"
+        return f"?{term}"
+
+    @override
+    def patterns_in_graph(self, body: set[tuple], name_dict: dict) -> bool:
+        #TODO: Add handling for negative examples
+        if not body:
+            return True
+
+        variables = sorted({
+            term for subject, _, object in body for term in (subject, object) if term not in name_dict
+        })
+
+        patterns = []
+
+        for subject, predicate, object in body:
+            s = self._format_pattern_term(subject, name_dict)
+            o = self._format_pattern_term(object, name_dict)
+            patterns.append(f"{s} <{predicate}> {o} .")
+
+        graph_pattern = "\n".join(patterns)
+
+        if not variables:
+            query = f"""
+            ASK WHERE {{
+                {graph_pattern}
+            }}
+            """
+            return self._ask(query)
+
+        select_variables = " ".join(f"?{variable}" for variable in variables)
+
+        query = f"""
+        SELECT DISTINCT {select_variables} WHERE {{
+            {graph_pattern}
+        }}
+        """
+        return len(self._select(query)) > 0
     #endregion
 
     # region Literals
