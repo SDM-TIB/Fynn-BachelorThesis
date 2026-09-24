@@ -1,7 +1,5 @@
 import os
 from typing import override
-
-import immutables
 import urllib3
 import orjson
 from collections import defaultdict
@@ -9,6 +7,15 @@ from rdflib import RDF
 from KnowledgeGraph.Graph import Graph as KG
 
 RDF_TYPE_URI = str(RDF.type)
+
+
+def to_internal_format(binding):
+    if binding["type"] == "literal":
+        if "datatype" in binding:
+            return f'"{binding["value"]}"^^{binding["datatype"]}'
+        return f'"{binding["value"]}"^^{"http://www.w3.org/2001/XMLSchema#string"}'
+    return binding["value"]
+
 
 class SPARQLKG(KG):
     def __init__(self, url, multiprocess: bool, workers: int):
@@ -52,29 +59,26 @@ class SPARQLKG(KG):
         self._client = None
         self._client_pid = None
 
-    def _select(self, query: str) -> list:
-        #TODO: Improve error handling
-        response = self.client.request("POST", self._endpoint_url, body=query.encode("utf-8"), headers={"Accept": "application/sparql-results+json", "Content-Type": "application/sparql-query"})
-        if response.status != 200:
-            print(f"Query: {query}")
-            print(f"Response: {response}")
-            print(f": {response.status}")
-            raise RuntimeError(response.status)
-        data = orjson.loads(response.data)
-        variables = data.get("head", {}).get("vars", [])
-        bindings = data.get("results", {}).get("bindings", {})
-        return [tuple(self.to_internal_format(binding[variable]) for variable in variables if variable in binding) for binding in bindings]
-
-    def _ask(self, query: str) -> bool:
+    def _send_query(self, query: str):
         response = self.client.request("POST", self._endpoint_url, body=query.encode("utf-8"),
                                        headers={"Accept": "application/sparql-results+json",
                                                 "Content-Type": "application/sparql-query"})
         if response.status != 200:
             print(f"Query: {query}")
             print(f"Response: {response}")
-            print(f": {response.status}")
+            print(f"Status: {response.status}")
+            print(f"Message: {response.data.decode('utf-8')}")
             raise RuntimeError(response.status)
-        data = orjson.loads(response.data)
+        return orjson.loads(response.data)
+
+    def _select(self, query: str) -> list:
+        data = self._send_query(query)
+        variables = data.get("head", {}).get("vars", [])
+        bindings = data.get("results", {}).get("bindings", {})
+        return [tuple(to_internal_format(binding[variable]) for variable in variables if variable in binding) for binding in bindings]
+
+    def _ask(self, query: str) -> bool:
+        data = self._send_query(query)
         return data["boolean"]
 
     def freeze(self, multiprocess: bool, workers: int):
@@ -86,13 +90,6 @@ class SPARQLKG(KG):
         # del self._negative_pred_mutable
         # del self._negative_triples_mutable
         pass
-
-    def to_internal_format(self, binding):
-        if binding["type"] == "literal":
-            if "datatype" in binding:
-                return f'"{binding["value"]}"^^{binding["datatype"]}'
-            return f'"{binding["value"]}"^^{"http://www.w3.org/2001/XMLSchema#string"}'
-        return binding["value"]
 
     def clean_uri(self, uri) -> str:
         return uri
@@ -199,39 +196,67 @@ class SPARQLKG(KG):
 
     @override
     def patterns_in_graph(self, body: set[tuple], name_dict: dict) -> bool:
-        #TODO: Add handling for negative examples
         if not body:
             return True
 
-        variables = sorted({
-            term for subject, _, object in body for term in (subject, object) if term not in name_dict
-        })
-
         patterns = []
-
+        filters = []
         for subject, predicate, object in body:
             s = self._format_pattern_term(subject, name_dict)
             o = self._format_pattern_term(object, name_dict)
             patterns.append(f"{s} <{predicate}> {o} .")
+            if predicate in self._negative_pred:
+                if subject in name_dict and object in name_dict:
+                    if (subject, object) in self._negative_pred[predicate]:
+                        return False
+                    continue
+                if subject in name_dict:
+                    values = "\n".join(
+                        f"(<{negative_o}>)" for negative_s, negative_o in self._negative_pred[predicate] if negative_s == subject)
+                    filters.append(f"""
+                        FILTER NOT EXISTS {{
+                            VALUES (?negative_o) {{
+                                {values}
+                            }}
+                            FILTER (?negative_o = {o})
+                        }}
+                        """)
+                    continue
+                if object in name_dict:
+                    values = "\n".join(
+                        f"(<{negative_s}>)" for negative_s, negative_o in self._negative_pred[predicate] if negative_o == object)
+                    filters.append(f"""
+                        FILTER NOT EXISTS {{
+                            VALUES (?negative_s) {{
+                                {values}
+                            }}
+                            FILTER (?negative_s = {s})
+                        }}
+                        """)
+                    continue
+                values = "\n".join(f"(<{negative_s}> "
+                                   f"<{negative_o}>)" for negative_s, negative_o in self._negative_pred[predicate])
+                filters.append(f"""
+                    FILTER NOT EXISTS {{
+                        VALUES (?negative_s ?negative_o) {{
+                            {values}
+                        }}
+                        FILTER (
+                            ?negative_s = {s} &&
+                            ?negative_o = {o}
+                        )
+                    }}
+                    """)
 
         graph_pattern = "\n".join(patterns)
-
-        if not variables:
-            query = f"""
-            ASK WHERE {{
-                {graph_pattern}
-            }}
-            """
-            return self._ask(query)
-
-        select_variables = " ".join(f"?{variable}" for variable in variables)
-
+        filter_pattern = "\n".join(filters)
         query = f"""
-        SELECT DISTINCT {select_variables} WHERE {{
+        ASK WHERE {{
             {graph_pattern}
+            {filter_pattern}
         }}
         """
-        return len(self._select(query)) > 0
+        return self._ask(query)
     #endregion
 
     # region Literals

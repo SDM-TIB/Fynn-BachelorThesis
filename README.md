@@ -1,10 +1,11 @@
 # Bachelor Thesis Fynn Torke
 
-Ron-a-Con is a rule mining algorithm for knowledge graphs stored in the RDF format that is constraint and ontology aware.
-This project is aimed at improving its performance and to explore different access methods for the knowledge graph.
+COARM is a constraint and ontology aware rule mining algorithm for knowledge graphs stored in the RDF format.
+This project is based on Ron-a-Con but improves and extends it. 
+COARM supports 4 different KG access strategies namely in-memory, in-memory numerical, SPARQL and hybrid.
 
 ## Execution and Options
-To be able to run this program, the following prerequisites have to be met:
-TODO: Add prerequisites
-The program can be run by the following command:
-
+To see all options execute the command:
+```console
+python main.py --help
+```

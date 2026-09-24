@@ -237,7 +237,7 @@ def expand_path_closed_rule(path: Path, knowledge_graph: Graph, ontology: Ontolo
         return {}
 
     if knowledge_graph.is_literal(frontier):
-        # TODO include literal comparisons as connection
+        # Expansion option: Include literal comparisons as connection
         return {}
 
     path_body = path.body

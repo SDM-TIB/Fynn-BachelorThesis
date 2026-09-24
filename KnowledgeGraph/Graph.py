@@ -144,57 +144,6 @@ class Graph(ABC):
 
         return True
 
-    # A batched approach seems to only be faster for SPARQL and only if run as a single process
-
-    # def expand_paths(self, rule_dict: dict, paths: set[Path], ontology, type_predicate: str):
-    #     path_frontier_map = []
-    #     frontiers_to_fetch = set()
-    #
-    #     for path in paths:
-    #         frontier = path.frontiers_closed_rule()
-    #         if frontier and not self.is_literal(frontier):
-    #             path_frontier_map.append((path, frontier))
-    #             frontiers_to_fetch.add(frontier)
-    #
-    #     if not frontiers_to_fetch:
-    #         return
-    #
-    #     adjacent_map = self.get_adjacent_triples_bulk(list(frontiers_to_fetch))
-    #
-    #     for path, frontier in path_frontier_map:
-    #         adjacent_triples = adjacent_map.get(frontier, set())
-    #         frontier = path.frontiers_closed_rule()
-    #         path_body = path.body
-    #         path_head = path.head
-    #         nodes = path.get_nodes()
-    #
-    #         for s, p, o in adjacent_triples:
-    #             if p == type_predicate:
-    #                 continue
-    #
-    #             triple = (s, p, o)
-    #             if triple in path_body or triple == path_head:
-    #                 continue
-    #
-    #             e = o if s == frontier else s
-    #
-    #             if e != frontier and e in nodes:
-    #                 continue
-    #
-    #             is_subject = (s == e)
-    #             if ontology.fits_domain_range(triple, self, type_predicate, check_domain=is_subject, check_range=not is_subject):
-    #                 new_path = path.copy()
-    #                 new_path.body.add(triple)
-    #                 rule = new_path.to_rule_closed_rule(self.resolve_to_uri)
-    #
-    #                 if rule in rule_dict:
-    #                     rule_dict[rule].add(new_path)
-    #                 else:
-    #                     rule_dict[rule] = {new_path}
-    #
-    # def get_adjacent_triples_bulk(self, nodes):
-    #     return {node: self.get_adjacent_triples(node) for node in nodes}
-
     @abstractmethod
     def get_adjacent_triples(self, node):
         """

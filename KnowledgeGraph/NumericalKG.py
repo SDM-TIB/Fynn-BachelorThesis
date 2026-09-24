@@ -1,5 +1,7 @@
 import gc
 import os
+import sys
+
 import immutables
 from collections import defaultdict
 from KnowledgeGraph.Graph import Graph
@@ -67,8 +69,8 @@ class NumericalKG(Graph):
             nonlocal next_id
             value_num = self.mapping_str_id.get(value)
             if value_num is None:
-                self.mapping_str_id[value] = next_id
-                self.mapping_id_str[next_id] = value
+                self.mapping_str_id[sys.intern(value)] = next_id
+                self.mapping_id_str[next_id] = sys.intern(value)
                 next_id += 1
                 return next_id - 1
             return value_num
