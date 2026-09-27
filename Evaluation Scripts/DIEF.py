@@ -3,11 +3,12 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 from diefpy import load_trace, plot_all_answer_traces, load_metrics, continuous_efficiency_with_diefk, \
-    plot_continuous_efficiency_with_diefk
+    plot_continuous_efficiency_with_diefk, plot_performance_of_approaches_with_dieft, \
+    performance_of_approaches_with_dieft
 
 parser = argparse.ArgumentParser(description="Create evaluations for DIEF")
 parser.add_argument("--kg-access-method",)
-
+parser.add_argument("--dataset-name")
 parser.add_argument("--dir",
                     type=Path,
                     required=True)
@@ -28,6 +29,18 @@ def load_traces_dir():
 
     return np.concatenate(traces)
 
+def metrics_from_traces(traces):
+    metrics = []
+
+    tests = np.unique(traces['test'])
+
+    for test in tests:
+        test_traces = traces[traces['test'] == test]
+        for approach in np.unique(test_traces['approach']):
+            rows = test_traces[test_traces['approach'] == approach]
+            metrics.append((test, approach, rows['time'].min(), rows['time'].max(), len(rows)))
+    return np.array(metrics, dtype=[('test', traces['test'].dtype), ('approach', traces['approach'].dtype), ('tfft', float), ('totaltime', float), ('comp', int)])
+
 def handle_metrics():
     metrics = list()
     for file in arguments.dir.iterdir():
@@ -41,12 +54,15 @@ def handle_traces():
         plot.show()
 
 def handle_dief_t():
-    pass
+    all_traces = load_traces_dir()
+    metrics = metrics_from_traces(all_traces)
+    exp = performance_of_approaches_with_dieft(all_traces, metrics)
+    plot_performance_of_approaches_with_dieft(exp, arguments.dataset_name, colors).show()
 
 def handle_dief_k():
     all_traces = load_traces_dir()
     con_efficiency = continuous_efficiency_with_diefk(all_traces)
-    plot_continuous_efficiency_with_diefk(con_efficiency, "DB100K", colors).show()
+    plot_continuous_efficiency_with_diefk(con_efficiency, arguments.dataset_name, colors).show()
 
 if __name__ == "__main__":
     arguments = parser.parse_args()

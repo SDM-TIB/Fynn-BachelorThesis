@@ -35,7 +35,6 @@ def generate_negative_triples(graph: KG, report_path, constraint_path) -> set[tu
 
         if matches_conditions:
             for s, p, o in graph.get_triples(graph.clean_uri(str(subject))):
-                #TODO: Check what to do about blank nodes
                 for pattern in filter_patterns:
                     predicate = graph.clean_uri(str(pattern.predicate))
                     object = graph.clean_uri(str(pattern.object)) if pattern.object else None

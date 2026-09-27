@@ -155,7 +155,12 @@ class NumericalKG(Graph):
     # region Specific
     def get_triples(self, subject = None, predicate = None, object = None):
         if not self._is_frozen:
-            return get_triples_from(subject, predicate, object, self._in_mutable, self._out_mutable, self._pred_mutable)
+            if isinstance(subject, str) or isinstance(predicate, str) or isinstance(object, str):
+                subject = self.mapping_str_id.get(subject, None)
+                predicate = self.mapping_str_id.get(predicate, None)
+                object = self.mapping_str_id.get(object, None)
+                # print(subject, predicate, object)
+            return { (self.clean_uri(self.resolve_to_uri(s)), self.clean_uri(self.resolve_to_uri(p)), self.clean_uri(self.resolve_to_uri(o))) for s, p, o in get_triples_from(subject, predicate, object, self._in_mutable, self._out_mutable, self._pred_mutable)}
         return get_triples_from(subject, predicate, object, self._in, self._out, self._pred)
 
     def get_type(self, subject, type_predicate):
