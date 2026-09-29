@@ -18,7 +18,7 @@ class MemoryKG(Graph):
         self._in_mutable = defaultdict(set[tuple[str, str]])
         self._pred_mutable = defaultdict(set[tuple[str, str]])
         self._type_mutable = defaultdict(set)
-        self._predicates_mutable = set()
+        # self._predicates_mutable = set()
         # self._negative_triples_mutable: set[tuple[str, str, str]] = set()
         self._negative_pred_mutable = defaultdict(set)
 
@@ -29,7 +29,7 @@ class MemoryKG(Graph):
         self._type = immutables.Map()
         self._negative_pred = immutables.Map()
         # self._negative_triples: tuple[tuple[str, str, str]] = tuple()
-        self._predicates: tuple[str] = tuple()
+        # self._predicates: tuple[str] = tuple()
         self._predicate_batches: tuple[tuple[str]] = tuple()
 
         if path:
@@ -65,7 +65,7 @@ class MemoryKG(Graph):
         self._out_mutable[s].add((p, o))
         self._in_mutable[o].add((p, s))
         self._pred_mutable[p].add((s, o))
-        self._predicates_mutable.add(p)
+        # self._predicates_mutable.add(p)
 
     def freeze(self, multiprocess: bool, workers: int):
         if self._is_frozen:
@@ -88,9 +88,9 @@ class MemoryKG(Graph):
         )
         # self._negative_triples = tuple(self._negative_triples_mutable)
         if multiprocess:
-            self._predicate_batches = super()._generate_predicate_batches(self._predicates_mutable, workers)
-        else:
-            self._predicates = tuple(self._predicates_mutable)
+            self._predicate_batches = super()._generate_predicate_batches(self.get_all_predicates(), workers)
+        # else:
+        #     self._predicates = tuple(self._predicates_mutable)
 
         del self._out_mutable
         del self._in_mutable
@@ -98,7 +98,7 @@ class MemoryKG(Graph):
         del self._type_mutable
         del self._negative_pred_mutable
         # del self._negative_triples_mutable
-        del self._predicates_mutable
+        # del self._predicates_mutable
         gc.collect()
         self._is_frozen = True
 
@@ -109,11 +109,19 @@ class MemoryKG(Graph):
         return sys.intern(token)
 
     def resolve_to_uri(self, node):
+        if self.is_literal(node):
+            return node
         return f"<{self._prefix}{node}>"
 
     # region Predicates
     def get_all_predicates(self):
-        return self._predicates
+        return list(self._pred)
+
+    # def get_all_subjects(self):
+    #     return list(self._out.keys())
+    #
+    # def get_all_objects(self):
+    #     return list(self._in.keys())
 
     def get_balanced_predicate_batches(self):
         return self._predicate_batches
@@ -158,10 +166,10 @@ class MemoryKG(Graph):
     def literal_type(self, node):
         if "^^" in node:
             full_type = node.rsplit("^^", 1)[1]
-            type = full_type.rsplit("#", 1)[1]
-            print(type)
+            type = full_type.rsplit(":", 1)[1]
+            type = type.rsplit("#", 1)[1]
             return type
-        return ""
+        return "anyType"
 
     def is_literal_comp(self, predicate):
         pass
@@ -182,7 +190,7 @@ class MemoryKG(Graph):
 
             if not self._pred_mutable[p]:
                 del self._pred_mutable[p]
-                self._predicates_mutable.discard(p)
+                # self._predicates_mutable.discard(p)
 
     def add_negative_triples(self, triples):
         if self._is_frozen:

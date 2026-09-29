@@ -1,13 +1,27 @@
+import sys
 from typing import override
-
-from diskcache import Cache
+from lru import LRU
 from KnowledgeGraph import Graph, SPARQLKG
+def evicted(key, value):
+  print("removing: %s, %s" % (key, value))
 
 class HybridKG(Graph):
     def __init__(self, url, prefix: str, multiprocess: bool, workers: int):
         self._prefix = prefix
-        self._sparql = SPARQLKG(url, multiprocess, workers)
-        self._cache = Cache(cache_dir="./kg_cache")
+        self._sparql = SPARQLKG(url, prefix, multiprocess, workers)
+        self._adj_cache = LRU(35_000, callback=evicted)
+        self._type_cache = LRU(35_000, callback=evicted)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state.pop('_adj_cache', None)
+        state.pop('_type_cache', None)
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._adj_cache = LRU(35_000, callback=evicted)
+        self._type_cache = LRU(35_000, callback=evicted)
 
     def freeze(self, multiprocess: bool, workers: int):
         self._sparql.freeze(multiprocess=multiprocess, workers=workers)
@@ -16,7 +30,7 @@ class HybridKG(Graph):
         return self._sparql.clean_uri(uri)
 
     def resolve_to_uri(self, node):
-        return node
+        return self._sparql.resolve_to_uri(node)
 
     def get_all_predicates(self):
         return self._sparql.get_all_predicates()
@@ -26,43 +40,27 @@ class HybridKG(Graph):
 
     def get_triples(self, subject=None, predicate=None, object=None):
         # No caching because cache hit is unlikely
-        cache_key = f"tr:{self.clean_uri(subject)}{predicate}{object}"
-        cached = self._cache.get(cache_key)
-        if cached:
-            return cached
-        result = self._sparql.get_triples(subject, predicate, object)
-        self._cache.set(cache_key, result)
-        return result
-        # return self._sparql.get_triples(subject, predicate, object)
+        return self._sparql.get_triples(subject, predicate, object)
 
     def get_type(self, subject, type_predicate):
-        cache_key = f"t:{self.clean_uri(subject)}"
-        cached = self._cache.get(cache_key)
-        if cached:
-            return cached
+        cache = self._type_cache.get(subject, None)
+        if not (cache is None):
+            return cache
         result = self._sparql.get_type(subject, type_predicate)
-        self._cache.set(cache_key, result)
+        self._type_cache[subject] = result
         return result
 
     def get_adjacent_triples(self, node):
-        cache_key = f"ad:{self.clean_uri(node)}"
-        cached = self._cache.get(cache_key)
-        if cached:
-            return cached
+        node = sys.intern(node)
+        cache = self._adj_cache.get(node, None)
+        if not (cache is None):
+            return cache
         result = self._sparql.get_adjacent_triples(node)
-        self._cache.set(cache_key, result)
+        self._adj_cache[node] = result
         return result
 
     def get_edges(self, predicate):
-        cache_key = f"ed:{self.clean_uri(predicate)}"
-        cached = self._cache.get(cache_key)
-        if cached:
-            print("Cache hit")
-            return cached
-        result = self._sparql.get_edges(predicate)
-        self._cache.set(cache_key, result)
-        return result
-        # return self._sparql.get_edges(predicate)
+        return self._sparql.get_edges(predicate)
 
     @override
     def patterns_in_graph(self, body: set[tuple], name_dict: dict) -> bool:

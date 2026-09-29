@@ -76,20 +76,12 @@ def process_target(predicate, set_size, type_predicate, max_depth, alpha, beta, 
         v = get_negative_examples(knowledge_graph, predicate, edges, ontology, set_size, type_predicate)
     edges = []
     del edges
-    # len_g = len(g)
-    # if len_g < set_size
-        # print(f"There aren't enough positive examples in the graph, proceeding with {len_g} examples.\n")
 
-    # len_v = len(v)
-    # if len_v < set_size:
-        # print(f"There aren't enough negative examples in the graph, proceeding with {len_v} examples.\n")
-
-    #TODO: Add warnings back
     if not g:
-        # warnings.warn(f"There are no generation examples for . No rule-mining possible \n", UserWarning)
+        print(f"There are no generation examples for {predicate}. No rule-mining possible \n")
         return []
     if not v:
-        # warnings.warn(f"There are no validation examples for . No rule-mining possible \n", UserWarning)
+        print(f"There are no validation examples for {predicate}. No rule-mining possible \n")
         return []
 
     # print(f"mining rules for target predicate <{predicate}>...\n")
@@ -108,28 +100,6 @@ def mine_rules_for_target_predicate(g: set[tuple], v: set[tuple], predicate, kno
 
     paths = {Path((s, predicate, o), set()) for s, o in g}
 
-    # TODO call expand rule here, duplicate code
-
-    # if isinstance(knowledge_graph, SPARQLKG) or isinstance(knowledge_graph, HybridKG):
-    #     with ThreadPoolExecutor() as executor:
-    #         futures = [
-    #             executor.submit(
-    #                 expand_path_closed_rule,
-    #                 path,
-    #                 knowledge_graph,
-    #                 ontology,
-    #                 type_predicate
-    #             )
-    #             for path in paths
-    #         ]
-    #         for f in as_completed(futures):
-    #             rule_dict_to_add = f.result()
-    #             for rule, new_paths in rule_dict_to_add.items():
-    #                 if rule in rule_dict:
-    #                     rule_dict[rule].update(new_paths)
-    #                 else:
-    #                     rule_dict[rule] = new_paths
-    # else:
     for path in paths:
         rule_dict_to_add = expand_path_closed_rule(path, knowledge_graph, ontology, type_predicate)
         for rule, new_paths in rule_dict_to_add.items():

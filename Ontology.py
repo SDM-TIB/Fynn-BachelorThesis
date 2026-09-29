@@ -5,7 +5,35 @@ from rdflib.plugins.parsers.notation3 import BadSyntax
 class Ontology:
     def __init__(self, classes=None, properties=None):
         self.classes = classes if classes is not None else dict()
-        self.properties = properties if properties is not None else dict()
+        self.properties: dict[str, tuple[set, set]] = properties if properties is not None else dict()
+        # Hierarchy from https://www.w3.org/TR/xmlschema11-2/type-hierarchy-201104.longdesc.html
+        self.literal_hierarchy = {
+            "anyType": {"anySimpleType"},
+            "anySimpleType": {"anyAtomicType", "ENTITIES", "IDREFS", "NMTOKENS"},
+            "anyAtomicType": {
+                "anyURI", "base64Binary", "boolean", "date", "dateTime", "decimal",
+                "double", "duration", "float", "gDay", "gMonth", "gMonthDay",
+                "gYear", "gYearMonth", "hexBinary", "NOTATION", "QName", "string",
+                "time"
+            },
+            "dateTime": {"dateTimeStamp"},
+            "decimal": {"integer"},
+            "integer": {"long", "nonNegativeInteger", "nonPositiveInteger"},
+            "long": {"int"},
+            "int": {"short"},
+            "short": {"byte"},
+            "nonNegativeInteger": {"positiveInteger", "unsignedLong"},
+            "unsignedLong": {"unsignedInt"},
+            "unsignedInt": {"unsignedShort"},
+            "unsignedShort": {"unsignedByte"},
+            "nonPositiveInteger": {"negativeInteger"},
+            "duration": {"dayTimeDuration", "yearMonthDuration"},
+            "string": {"normalizedString"},
+            "normalizedString": {"token"},
+            "token": {"language", "Name", "NMTOKEN"},
+            "Name": {"NCName"},
+            "NCName": {"ENTITY", "ID", "IDREF"}
+        }
 
     def get_name(self, node):
         return str(node).strip("<>").split('/')[-1].split('#')[-1]
@@ -29,22 +57,21 @@ class Ontology:
             self.properties[p_name][0].update(domains)
             self.properties[p_name][1].update(ranges)
 
-    def get_all_supertypes(self, class_name: str) -> set[str]:
-        """Recursively collects all direct and indirect superclasses (transitive closure)."""
+    def get_all_supertypes(self, name: str, dictionary: dict) -> set[str]:
+        """Recursively collects all direct and indirect superclasses or supertypes."""
         visited = set()
-        queue = [class_name]
+        queue = [name]
 
         while queue:
-            curr = queue.pop(0)
-            if curr not in visited:
-                visited.add(curr)
-                parents = self.classes.get(curr, set())
+            current = queue.pop(0)
+            if current not in visited:
+                visited.add(current)
+                parents = dictionary.get(current, set())
                 queue.extend(parents - visited)
 
         return visited
 
     def fits_domain_range(self, triple, kg: KG, type_predicate, check_domain=True, check_range=True):
-        #TODO: Add support for literals and literal comparisons
         """
         Validates if a given triple (s, p, o) satisfies the ontology domain and range constraints.
         If domain/range are unspecified in the ontology for predicate p, it passes by default.
@@ -65,10 +92,17 @@ class Ontology:
 
             s_expanded_types = set()
             for t in s_types:
-                s_expanded_types.update(self.get_all_supertypes(t))
+                s_expanded_types.update(self.get_all_supertypes(t, self.classes))
 
             if not domain_types.intersection(s_expanded_types):
                 return False
+
+        if kg.is_literal(obj):
+            o_types = self.get_all_supertypes(kg.literal_type(obj), self.literal_hierarchy)
+            if range_types.isdisjoint(o_types):
+                return False
+            else:
+                return True
 
         if check_range and range_types:
             o_types = self._get_entity_types(obj, kg, type_predicate)
@@ -77,7 +111,7 @@ class Ontology:
 
             o_expanded_types = set()
             for t in o_types:
-                o_expanded_types.update(self.get_all_supertypes(t))
+                o_expanded_types.update(self.get_all_supertypes(t, self.classes))
 
             if not range_types.intersection(o_expanded_types):
                 return False

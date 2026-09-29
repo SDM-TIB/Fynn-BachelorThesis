@@ -35,7 +35,7 @@ def get_negative_examples(knowledge_graph: Graph, predicate, edges, ontology: On
     # are highly unlikely to result in any examples that are semantically sound and of any real use.
     # if len(examples) < set_size:
     #     print(f"There aren't enough negative examples in the graph, choosing {set_size - len(examples)} random examples.\n")
-    #     examples.update(get_random_negative_examples(knowledge_graph, predicate, set_size - len(examples), examples))
+    #     examples.update(get_random_negative_examples(knowledge_graph, edges, set_size - len(examples), examples))
 
     return examples
 
@@ -83,10 +83,11 @@ def get_LCWA_negative_examples(knowledge_graph, predicate, edges, ontology, coun
 
     return out
 
-# def get_random_negative_examples(knowledge_graph, predicate, set_size, already_selected: set[tuple], max_attempts=None) -> set[tuple]:
+# def get_random_negative_examples(knowledge_graph, edges, set_size, already_selected: set[tuple], max_attempts=None) -> set[tuple]:
 #     out = set()
 #     already_selected = already_selected or set()
-#     forbidden_pairs = set(knowledge_graph.get_edges(predicate))
+#     forbidden_pairs = edges
+#     rng = random.Random(30220938)
 #
 #     subset_size = max(set_size * 5, 100)
 #
@@ -102,8 +103,8 @@ def get_LCWA_negative_examples(knowledge_graph, predicate, edges, ontology, coun
 #     if k_subs == 0 or k_objs == 0:
 #         return out
 #
-#     sub_pool = random.sample(all_subs, k_subs)
-#     obj_pool = random.sample(all_objs, k_objs)
+#     sub_pool = rng.sample(all_subs, k_subs)
+#     obj_pool = rng.sample(all_objs, k_objs)
 #
 #     if max_attempts is None:
 #         max_attempts = set_size * 20
@@ -111,8 +112,8 @@ def get_LCWA_negative_examples(knowledge_graph, predicate, edges, ontology, coun
 #
 #     while len(out) < set_size and attempts < max_attempts:
 #         attempts += 1
-#         s = random.choice(sub_pool)
-#         o = random.choice(obj_pool)
+#         s = rng.choice(sub_pool)
+#         o = rng.choice(obj_pool)
 #         pair = (s, o)
 #
 #         if pair in forbidden_pairs or pair in already_selected or pair in out:

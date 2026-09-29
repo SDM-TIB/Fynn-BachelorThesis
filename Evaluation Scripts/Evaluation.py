@@ -2,7 +2,7 @@ import argparse
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
-from diefpy import load_trace, plot_all_answer_traces, load_metrics, continuous_efficiency_with_diefk, \
+from diefpy import load_trace, plot_all_answer_traces, continuous_efficiency_with_diefk, \
     plot_continuous_efficiency_with_diefk, plot_performance_of_approaches_with_dieft, \
     performance_of_approaches_with_dieft
 
@@ -14,7 +14,7 @@ parser.add_argument("--dir",
                     required=True)
 parser.add_argument("--type",
                     type=str,
-                    choices=("traces", "metrics", "dief@t", "dief@k"),
+                    choices=("traces", "dief@t", "dief@k"),
                     required=True)
 parser.add_argument("--at-time",
                     type=float)
@@ -41,12 +41,6 @@ def metrics_from_traces(traces):
             metrics.append((test, approach, rows['time'].min(), rows['time'].max(), len(rows)))
     return np.array(metrics, dtype=[('test', traces['test'].dtype), ('approach', traces['approach'].dtype), ('tfft', float), ('totaltime', float), ('comp', int)])
 
-def handle_metrics():
-    metrics = list()
-    for file in arguments.dir.iterdir():
-        if file.suffix == ".csv":
-            metrics.append(load_metrics(file))
-
 def handle_traces():
     all_traces = load_traces_dir()
     for plot in plot_all_answer_traces(all_traces, colors):
@@ -69,8 +63,6 @@ if __name__ == "__main__":
     match arguments.type:
         case "traces":
             handle_traces()
-        case "metrics":
-            handle_metrics()
         case "dief@t":
             handle_dief_t()
         case "dief@k":

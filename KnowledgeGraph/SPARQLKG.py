@@ -1,4 +1,5 @@
 import os
+import sys
 from typing import override
 import urllib3
 import orjson
@@ -13,12 +14,12 @@ def to_internal_format(binding):
     if binding["type"] == "literal":
         if "datatype" in binding:
             return f'"{binding["value"]}"^^{binding["datatype"]}'
-        return f'"{binding["value"]}"^^{"http://www.w3.org/2001/XMLSchema#string"}'
+        return f'"{binding["value"]}"'
     return binding["value"]
 
-
 class SPARQLKG(KG):
-    def __init__(self, url, multiprocess: bool, workers: int):
+    def __init__(self, url, prefix: str, multiprocess: bool, workers: int):
+        self._prefix: str = prefix
         self._endpoint_url = url
         self._client = None
         self._client_pid = None
@@ -92,11 +93,16 @@ class SPARQLKG(KG):
         pass
 
     def clean_uri(self, uri) -> str:
-        return uri
+        return sys.intern(uri)
 
 
     def resolve_to_uri(self, node):
         return node
+
+    def _to_query_format(self, value):
+        if self.is_literal(value):
+            return value
+        return f"<{value}>"
 
     # region Predicates
     def get_all_predicates(self):
@@ -129,7 +135,6 @@ class SPARQLKG(KG):
     #endregion
 
     # region Specific
-    #TODO: Check input data types
     def get_triples(self, subject = None, predicate = None, object = None):
         s_node = f"<{subject}>" if subject else "?s"
         p_node = f"<{predicate}>" if predicate else "?p"
@@ -191,7 +196,7 @@ class SPARQLKG(KG):
 
     def _format_pattern_term(self, term: str, name_dict: dict) -> str:
         if term in name_dict:
-            return f"<{name_dict[term]}>"
+            return f"{self._to_query_format(self.resolve_to_uri(name_dict[term]))}"
         return f"?{term}"
 
     @override
@@ -204,7 +209,7 @@ class SPARQLKG(KG):
         for subject, predicate, object in body:
             s = self._format_pattern_term(subject, name_dict)
             o = self._format_pattern_term(object, name_dict)
-            patterns.append(f"{s} <{predicate}> {o} .")
+            patterns.append(f"{s} <{self.resolve_to_uri(predicate)}> {o} .")
             if predicate in self._negative_pred:
                 if subject in name_dict and object in name_dict:
                     if (subject, object) in self._negative_pred[predicate]:
@@ -267,7 +272,12 @@ class SPARQLKG(KG):
         pass
 
     def literal_type(self, node):
-        pass
+        if "^^" in node:
+            full_type = node.rsplit("^^", 1)[1]
+            type = full_type.rsplit(":", 1)[1]
+            type = type.rsplit("#", 1)[1]
+            return type
+        return "anyType"
 
     def is_literal_comp(self, predicate):
         pass
@@ -279,8 +289,8 @@ class SPARQLKG(KG):
 
     def add_negative_triples(self, triples):
         for s, p, o in triples:
-            s_clean = self.clean_uri(s)
-            p_clean = self.clean_uri(p)
-            o_clean = self.clean_uri(o)
+            s_clean = sys.intern(self.clean_uri(s))
+            p_clean = sys.intern(self.clean_uri(p))
+            o_clean = sys.intern(self.clean_uri(o))
             self._negative_triples.add((s_clean, p_clean, o_clean))
             self._negative_pred[p_clean].add((s_clean, o_clean))

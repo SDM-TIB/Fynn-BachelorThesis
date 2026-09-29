@@ -142,6 +142,8 @@ class NumericalKG(Graph):
         return token
 
     def resolve_to_uri(self, node):
+        if self.is_literal(node):
+            return self.mapping_id_str[node]
         return f"{self._prefix}{self.mapping_id_str[node]}"
 
     # region Predicates
@@ -187,13 +189,23 @@ class NumericalKG(Graph):
 
     # region Literals
     def is_literal(self, object):
+        if isinstance(object, str):
+            return object.startswith('"')
         return object < 0
 
     def is_valid_comp(self, node):
         pass
 
     def literal_type(self, node):
-        pass
+        if not isinstance(node, str):
+            node = self.mapping_id_str.get(node, "")
+        if "^^" in node:
+            full_type = node.rsplit("^^", 1)[1]
+            type = full_type.rsplit(":", 1)[1]
+            type = type.rsplit("#", 1)[1]
+            return type
+        return "anyType"
+
 
     def is_literal_comp(self, predicate):
         pass
@@ -228,3 +240,4 @@ class NumericalKG(Graph):
             p_num = self.mapping_str_id.get(p)
             self._negative_triples_mutable.add((s_num, p_num, o_num))
             self._negative_pred_mutable[p_num].add((s_num, o_num))
+        self.remove_triples(triples)

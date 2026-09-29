@@ -89,7 +89,7 @@ def create_graph(arguments) -> Graph:
         case "hybrid":
             return HybridKG(arguments.sparql_access_url, arguments.prefix, arguments.multiprocess, arguments.workers)
         case "sparql":
-            return SPARQLKG(arguments.sparql_access_url, arguments.multiprocess, arguments.workers)
+            return SPARQLKG(arguments.sparql_access_url, arguments.prefix, arguments.multiprocess, arguments.workers)
     raise ValueError("Invalid argument for --kg-access-method")
 
 if __name__ == '__main__':
@@ -113,14 +113,14 @@ if __name__ == '__main__':
     negative_triples = generate_negative_triples(graph, validation_report_path, arguments.constraint_path)
     print(f"Generated {len(negative_triples)} negative triples in: ", time.time() - negative_example_generation_start_time)
     graph.add_negative_triples(negative_triples)
-
+    del negative_triples
     ontology = parse_ontology(arguments.ontology_path)
     graph.freeze(multiprocess=arguments.multiprocess, workers=arguments.workers)
     # tracer.start()
     start_rule_mining = time.time()
     rules = mine_rules(knowledge_graph=graph, ontology=ontology, set_size=arguments.example_set_size, max_depth=arguments.max_body_length, alpha=0.5, multiprocessing=arguments.multiprocess, workers=arguments.workers, mine_negative=arguments.mine_negative_rules)
 
-    print("Mined rules in: ", time.time() - start_rule_mining)
+    print(f"Mined {len(rules)} rules in: {time.time() - start_rule_mining}")
     print("Total time: ", time.time() - start_time)
     # tracer.stop()
     # tracer.save()
