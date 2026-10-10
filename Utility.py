@@ -33,3 +33,30 @@ def get_triples_from(subject, predicate, object, in_set, out_set, pred_set):
         for s, o in pairs:
             all_triples.add((s, p, o))
     return all_triples
+
+def triple_exists(subject, predicate, object, in_set, out_set, pred_set):
+    if subject is not None and predicate is not None and object is not None:
+        return (predicate, object) in out_set.get(subject, ())
+
+    if subject is not None:
+        pairs = out_set.get(subject, ())
+        for p, o in pairs:
+            if (predicate is None or p == predicate) and (object is None or o == object):
+                return True
+        return False
+
+    if object is not None:
+        pairs = in_set.get(object, ())
+        for p, s in pairs:
+            if (predicate is None or p == predicate) and (subject is None or s == subject):
+                return True
+        return False
+
+    if predicate is not None:
+        pairs = pred_set.get(predicate, ())
+        for s, o in pairs:
+            if (subject is None or s == subject) and (object is None or o == object):
+                return True
+        return False
+
+    return True

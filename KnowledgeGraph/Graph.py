@@ -63,6 +63,14 @@ class Graph(ABC):
         return tuple(tuple(batch) for batch in batches)
     #endregion
 
+    @abstractmethod
+    def get_subject_pool(self, maximum_set_size: int, rng):
+        pass
+
+    @abstractmethod
+    def get_object_pool(self, maximum_set_size: int, rng):
+        pass
+
     # region Specific
     @abstractmethod
     def get_triples(self, subject = None, predicate = None, object = None):
@@ -76,12 +84,20 @@ class Graph(ABC):
         pass
 
     @abstractmethod
+    def triple_exists(self, subject, predicate, object) -> bool:
+        pass
+
+    @abstractmethod
     def get_type(self, subject, type_predicate):
         """
         This function only returns correct information after freeze has been called.
         :param subject:
         :param type_predicate:
         """
+        pass
+
+    @abstractmethod
+    def get_types_batched(self, subjects, type_predicate):
         pass
 
     def patterns_in_graph(self, body: set[tuple], name_dict: dict) -> bool:
@@ -105,7 +121,7 @@ class Graph(ABC):
                 s_var, p, o_var = best_pattern
                 new_solutions = []
                 for sol in solutions:
-                    if bool(self.get_triples(subject=sol[s_var], predicate=p, object=sol[o_var])):
+                    if self.triple_exists(subject=sol[s_var], predicate=p, object=sol[o_var]):
                         new_solutions.append(sol)
                 solutions = new_solutions
                 handled_patterns.add(best_pattern)
@@ -173,37 +189,27 @@ class Graph(ABC):
     #endregion
 
     #region Literals
-    @abstractmethod
     def is_literal(self, object):
-        """
-        Evaluates the given object and returns a true if the object is a literal and false otherwise.
-        :param object:
-        """
-        pass
+        return object.startswith('"')
 
-    @abstractmethod
-    def is_valid_comp(self, node):
-        """
+    def is_valid_comp(self, triple):
+        if not self.is_literal_comp(triple[1]) or (self.literal_type(triple[0]) != self.literal_type(triple[2])):
+            return False
 
-        :param node:
-        """
-        pass
+        return not ((triple[1] == "=" and triple[0] != triple[2]) or
+                    (triple[1] == "<" and triple[0] >= triple[2]) or
+                    (triple[1] == ">" and triple[0] <= triple[2]))
 
-    @abstractmethod
     def literal_type(self, node):
-        """
+        if "^^" in node:
+            full_type = node.rsplit("^^", 1)[1]
+            type = full_type.rsplit(":", 1)[1]
+            type = type.rsplit("#", 1)[1]
+            return type
+        return "anyType"
 
-        :param node:
-        """
-        pass
-
-    @abstractmethod
     def is_literal_comp(self, predicate):
-        """
-
-        :param predicate:
-        """
-        pass
+        return predicate == "=" or predicate == "<" or predicate == ">"
     #endregion
 
     # Modification

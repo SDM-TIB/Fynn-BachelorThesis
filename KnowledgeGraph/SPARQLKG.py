@@ -1,5 +1,6 @@
 import os
 import sys
+from math import ceil
 from typing import override
 import urllib3
 import orjson
@@ -32,12 +33,8 @@ class SPARQLKG(KG):
                     !STRSTARTS(STR(?p), "http://proton.semanticweb.org/protonsys#")
                 )
                 """
-        # Mutable for initialization
         self._negative_triples: set[tuple[str, str, str]] = set()
         self._negative_pred: defaultdict = defaultdict(set)
-        # Immutable for multiprocess compatibility
-        # self._negative_pred = immutables.Map()
-        # self._negative_triples: tuple[tuple[str, str, str]] = tuple()
 
     @property
     def client(self):
@@ -70,7 +67,9 @@ class SPARQLKG(KG):
             print(f"Status: {response.status}")
             print(f"Message: {response.data.decode('utf-8')}")
             raise RuntimeError(response.status)
-        return orjson.loads(response.data)
+        data = orjson.loads(response.data)
+        del response
+        return data
 
     def _select(self, query: str) -> list:
         data = self._send_query(query)
@@ -83,26 +82,21 @@ class SPARQLKG(KG):
         return data["boolean"]
 
     def freeze(self, multiprocess: bool, workers: int):
-        # self._negative_pred = immutables.Map(
-        #     {predicate: tuple(pairs) for predicate, pairs in self._negative_pred_mutable.items()}
-        # )
-        # self._negative_triples = tuple(self._negative_triples_mutable)
-        #
-        # del self._negative_pred_mutable
-        # del self._negative_triples_mutable
         pass
 
     def clean_uri(self, uri) -> str:
-        return sys.intern(uri)
+        return sys.intern(uri.removeprefix(self._prefix))
 
 
     def resolve_to_uri(self, node):
-        return node
+        if self.is_literal(node) or node.startswith("http"):
+            return node
+        return f"{self._prefix}{node}"
 
     def _to_query_format(self, value):
         if self.is_literal(value):
             return value
-        return f"<{value}>"
+        return f"<{self.resolve_to_uri(value)}>"
 
     # region Predicates
     def get_all_predicates(self):
@@ -134,16 +128,40 @@ class SPARQLKG(KG):
         return tuple(tuple(batch) for batch in batches)
     #endregion
 
+    def get_subject_pool(self, maximum_set_size: int, rng):
+        # rng can not be considered here so this introduces unseeded randomness
+        query = (f"""
+        SELECT DISTINCT ?s WHERE {{
+            ?s ?p ?o .
+        }}
+        ORDER BY RAND() LIMIT {maximum_set_size}
+        """)
+        return { self.clean_uri(row[0]) for row in self._select(query)}
+
+    def get_object_pool(self, maximum_set_size: int, rng):
+        # rng can not be considered here so this introduces unseeded randomness
+        query = (f"""
+        SELECT DISTINCT ?o WHERE {{
+            ?s ?p ?o .
+        }}
+        ORDER BY RAND() LIMIT {maximum_set_size}
+        """)
+        return { self.clean_uri(row[0]) for row in self._select(query)}
+
     # region Specific
+    def triple_exists(self, subject, predicate, object) -> bool:
+        # Never used in SPARQL or Hybrid approach
+        pass
+
     def get_triples(self, subject = None, predicate = None, object = None):
-        s_node = f"<{subject}>" if subject else "?s"
-        p_node = f"<{predicate}>" if predicate else "?p"
+        s_node = f"<{self.resolve_to_uri(subject)}>" if subject else "?s"
+        p_node = f"<{self.resolve_to_uri(predicate)}>" if predicate else "?p"
         if object is None:
             o_node = "?o"
         elif self.is_literal(object):
             o_node = f"{object}"
         else:
-            o_node = f"<{object}>"
+            o_node = f"<{self.resolve_to_uri(object)}>"
 
         s_bind = f"BIND({s_node} AS ?s)" if subject else ""
         p_bind = f"BIND({p_node} AS ?p)" if predicate else ""
@@ -159,36 +177,60 @@ class SPARQLKG(KG):
         }}
         """
         results = { (self.clean_uri(s), self.clean_uri(p), self.clean_uri(o)) for s, p, o in self._select(query) }
-        if not self._negative_triples:
-            return results
-
-        if predicate and predicate in self._negative_pred:
-            negative_pairs = self._negative_pred.get(predicate, set())
-            return { triple for triple in results if (triple[0], triple[2]) not in negative_pairs }
 
         return results - self._negative_triples
 
     def get_type(self, subject, type_predicate):
         if self.is_literal(subject):
             return list()
-        s_node = f"<{subject}>"
+        s_node = f"<{self.resolve_to_uri(subject)}>"
         p_node = f"<{type_predicate}>"
         query = f"SELECT DISTINCT ?o WHERE {{ {s_node} {p_node} ?o }}"
         return { self.clean_uri(value[0]) for value in self._select(query) }
 
+    def get_types_batched(self, subjects, type_predicate) -> dict:
+        subjects = { subject for subject in subjects if not self.is_literal(subject) }
+        if not subjects:
+            return {}
+        subjects = list(subjects)
+        batch_size = 2500
+        batches = ceil(len(subjects)/batch_size)
+        result = {subject: set() for subject in subjects}
+        for i in range(0, batches):
+            batch = subjects[i*batch_size:(i+1)*batch_size]
+            values = " ".join(f"<{self.resolve_to_uri(subject)}>" for subject in batch)
+            query = f"""
+            SELECT DISTINCT ?s ?o WHERE {{
+                VALUES ?s {{ {values} }}
+                ?s <{type_predicate}> ?o .
+            }}
+            """
+            for s, t in self._select(query):
+                result[self.clean_uri(s)].add(self.clean_uri(t))
+        return result
+
     def get_adjacent_triples(self, node):
+        if self.is_literal(node):
+            query = f"""
+            SELECT DISTINCT ?s ?p  WHERE {{
+                ?s ?p {node} .
+                {self._type_filter}
+            }}
+            """
+            return {(self.clean_uri(s), self.clean_uri(p), node) for s, p in
+                    self._select(query)} - self._negative_triples
         query = f"""
         SELECT DISTINCT ?s ?p ?o WHERE {{
-            {{ <{node}> ?p ?o . BIND(<{node}> AS ?s) }}
+            {{ <{self.resolve_to_uri(node)}> ?p ?o . BIND(<{self.resolve_to_uri(node)}> AS ?s) }}
             UNION
-            {{ ?s ?p <{node}> . BIND(<{node}> AS ?o) }}
+            {{ ?s ?p <{self.resolve_to_uri(node)}> . BIND(<{self.resolve_to_uri(node)}> AS ?o) }}
             {self._type_filter}
         }}
         """
         return { (self.clean_uri(s), self.clean_uri(p), self.clean_uri(o)) for s, p, o in self._select(query) } - self._negative_triples
 
     def get_edges(self, predicate):
-        query = f"SELECT DISTINCT ?s ?o WHERE {{ ?s <{predicate}> ?o }}"
+        query = f"SELECT DISTINCT ?s ?o WHERE {{ ?s <{self.resolve_to_uri(predicate)}> ?o }}"
         return {(self.clean_uri(row[0]), self.clean_uri(row[1])) for row in self._select(query)} - self.get_negative_edges(predicate)
 
     def get_negative_edges(self, predicate):
@@ -196,7 +238,7 @@ class SPARQLKG(KG):
 
     def _format_pattern_term(self, term: str, name_dict: dict) -> str:
         if term in name_dict:
-            return f"{self._to_query_format(self.resolve_to_uri(name_dict[term]))}"
+            return f"{self._to_query_format(name_dict[term])}"
         return f"?{term}"
 
     @override
@@ -216,8 +258,14 @@ class SPARQLKG(KG):
                         return False
                     continue
                 if subject in name_dict:
-                    values = "\n".join(
-                        f"(<{negative_o}>)" for negative_s, negative_o in self._negative_pred[predicate] if negative_s == subject)
+                    negative_objects = set()
+                    for negative_s, negative_o in self._negative_pred[predicate]:
+                        if negative_s == name_dict[subject]:
+                            if self.is_literal(negative_o):
+                                negative_objects.add(negative_o)
+                            else:
+                                negative_objects.add(f"(<{self.resolve_to_uri(negative_o)}>)")
+                    values = "\n".join(negative_o for negative_o in negative_objects)
                     filters.append(f"""
                         FILTER NOT EXISTS {{
                             VALUES (?negative_o) {{
@@ -229,7 +277,7 @@ class SPARQLKG(KG):
                     continue
                 if object in name_dict:
                     values = "\n".join(
-                        f"(<{negative_s}>)" for negative_s, negative_o in self._negative_pred[predicate] if negative_o == object)
+                        f"(<{self.resolve_to_uri(negative_s)}>)" for negative_s, negative_o in self._negative_pred[predicate] if negative_o == name_dict[object])
                     filters.append(f"""
                         FILTER NOT EXISTS {{
                             VALUES (?negative_s) {{
@@ -239,8 +287,9 @@ class SPARQLKG(KG):
                         }}
                         """)
                     continue
-                values = "\n".join(f"(<{negative_s}> "
-                                   f"<{negative_o}>)" for negative_s, negative_o in self._negative_pred[predicate])
+                values = "\n".join(f"(<{self.resolve_to_uri(negative_s)}> "
+                                   f"{negative_o})" if self.is_literal(negative_o) else f"(<{self.resolve_to_uri(negative_s)}> "
+                                                                                         f"<{self.resolve_to_uri(negative_o)}>)" for negative_s, negative_o in self._negative_pred[predicate])
                 filters.append(f"""
                     FILTER NOT EXISTS {{
                         VALUES (?negative_s ?negative_o) {{
@@ -264,33 +313,12 @@ class SPARQLKG(KG):
         return self._ask(query)
     #endregion
 
-    # region Literals
-    def is_literal(self, object):
-        return object.startswith('"')
-
-    def is_valid_comp(self, node):
-        pass
-
-    def literal_type(self, node):
-        if "^^" in node:
-            full_type = node.rsplit("^^", 1)[1]
-            type = full_type.rsplit(":", 1)[1]
-            type = type.rsplit("#", 1)[1]
-            return type
-        return "anyType"
-
-    def is_literal_comp(self, predicate):
-        pass
-    # endregion
-
-    # Modification
-    def remove_triples(self, triples):
-        pass
-
+    #region Negative Triples
     def add_negative_triples(self, triples):
         for s, p, o in triples:
-            s_clean = sys.intern(self.clean_uri(s))
-            p_clean = sys.intern(self.clean_uri(p))
-            o_clean = sys.intern(self.clean_uri(o))
+            s_clean = self.clean_uri(s)
+            p_clean = self.clean_uri(p)
+            o_clean = self.clean_uri(o)
             self._negative_triples.add((s_clean, p_clean, o_clean))
             self._negative_pred[p_clean].add((s_clean, o_clean))
+    #endregion

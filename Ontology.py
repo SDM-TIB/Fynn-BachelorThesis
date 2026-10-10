@@ -57,6 +57,11 @@ class Ontology:
             self.properties[p_name][0].update(domains)
             self.properties[p_name][1].update(ranges)
 
+    #This is in line with the Ron-a-Con behavior
+    def get_direct_supertypes(self, name: str, dictionary: dict):
+        """Collects only the direct supertypes of a given class."""
+        return dictionary.get(name, set())
+
     def get_all_supertypes(self, name: str, dictionary: dict) -> set[str]:
         """Recursively collects all direct and indirect superclasses or supertypes."""
         visited = set()
@@ -74,14 +79,17 @@ class Ontology:
     def fits_domain_range(self, triple, kg: KG, type_predicate, check_domain=True, check_range=True):
         """
         Validates if a given triple (s, p, o) satisfies the ontology domain and range constraints.
-        If domain/range are unspecified in the ontology for predicate p, it passes by default.
         """
         subject = kg.resolve_to_uri(triple[0])
         predicate = kg.resolve_to_uri(triple[1])
         obj = kg.resolve_to_uri(triple[2])
         p_name = self.get_name(predicate)
+
+        if kg.is_literal_comp(predicate):
+            return kg.is_literal(obj) and kg.is_literal_comp(triple)
+
         if p_name not in self.properties:
-            return True
+            return False
 
         domain_types, range_types = self.properties[p_name]
 
@@ -90,14 +98,15 @@ class Ontology:
             if not s_types:
                 return False
 
-            s_expanded_types = set()
+            s_expanded_types: set = s_types.copy()
             for t in s_types:
-                s_expanded_types.update(self.get_all_supertypes(t, self.classes))
-
-            if not domain_types.intersection(s_expanded_types):
+                s_expanded_types.update(self.get_direct_supertypes(t, self.classes))
+            if domain_types.isdisjoint(s_expanded_types):
                 return False
+        elif check_domain:
+            return False
 
-        if kg.is_literal(obj):
+        if kg.is_literal(obj) and range_types:
             o_types = self.get_all_supertypes(kg.literal_type(obj), self.literal_hierarchy)
             if range_types.isdisjoint(o_types):
                 return False
@@ -109,12 +118,14 @@ class Ontology:
             if not o_types:
                 return False
 
-            o_expanded_types = set()
+            o_expanded_types: set = o_types.copy()
             for t in o_types:
-                o_expanded_types.update(self.get_all_supertypes(t, self.classes))
+                o_expanded_types.update(self.get_direct_supertypes(t, self.classes))
 
-            if not range_types.intersection(o_expanded_types):
+            if range_types.isdisjoint(o_expanded_types):
                 return False
+        elif check_range:
+            return False
 
         return True
 
@@ -127,6 +138,58 @@ class Ontology:
             types.add(self.get_name(t))
         return types
 
+    def fits_domain_range_known_types(self, triple, kg: KG, types: tuple[set[str]], check_domain=True, check_range=True):
+        """
+        Validates if a given triple (s, p, o) satisfies the ontology domain and range constraints.
+        """
+        predicate = kg.resolve_to_uri(triple[1])
+        obj = kg.resolve_to_uri(triple[2])
+        p_name = self.get_name(predicate)
+
+        if kg.is_literal_comp(predicate):
+            return kg.is_literal(obj) and kg.is_literal_comp(triple)
+
+        if p_name not in self.properties:
+            return False
+
+        domain_types, range_types = self.properties[p_name]
+
+        if check_domain and domain_types:
+            s_types = types[0]
+            if not s_types:
+                return False
+            s_types = { self.get_name(t) for t in s_types }
+            s_expanded_types: set = s_types.copy()
+            for t in s_types:
+                s_expanded_types.update(self.get_direct_supertypes(t, self.classes))
+
+            if domain_types.isdisjoint(s_expanded_types):
+                return False
+        elif check_domain:
+            return False
+
+        if kg.is_literal(obj) and range_types:
+            o_types = self.get_all_supertypes(kg.literal_type(obj), self.literal_hierarchy)
+            if range_types.isdisjoint(o_types):
+                return False
+            else:
+                return True
+
+        if check_range and range_types:
+            o_types = types[1]
+            if not o_types:
+                return False
+            o_types = {self.get_name(t) for t in o_types}
+            o_expanded_types: set = o_types.copy()
+            for t in o_types:
+                o_expanded_types.update(self.get_direct_supertypes(t, self.classes))
+
+            if range_types.isdisjoint(o_expanded_types):
+                return False
+        elif check_range:
+            return False
+
+        return True
 
 def parse_ontology(ontology_file: str) -> Ontology:
     """Parses a Turtle (.ttl) ontology file using RDFLib into an Ontology object."""

@@ -9,8 +9,8 @@ class HybridKG(Graph):
     def __init__(self, url, prefix: str, multiprocess: bool, workers: int):
         self._prefix = prefix
         self._sparql = SPARQLKG(url, prefix, multiprocess, workers)
-        self._adj_cache = LRU(35_000, callback=evicted)
-        self._type_cache = LRU(35_000, callback=evicted)
+        self._adj_cache = LRU(30_000)
+        self._type_cache = LRU(75_000)
 
     def __getstate__(self):
         state = self.__dict__.copy()
@@ -20,8 +20,8 @@ class HybridKG(Graph):
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        self._adj_cache = LRU(35_000, callback=evicted)
-        self._type_cache = LRU(35_000, callback=evicted)
+        self._adj_cache = LRU(30_000)
+        self._type_cache = LRU(75_000)
 
     def freeze(self, multiprocess: bool, workers: int):
         self._sparql.freeze(multiprocess=multiprocess, workers=workers)
@@ -35,12 +35,38 @@ class HybridKG(Graph):
     def get_all_predicates(self):
         return self._sparql.get_all_predicates()
 
+    def get_subject_pool(self, maximum_set_size: int, rng):
+        return self._sparql.get_subject_pool(maximum_set_size, rng)
+
+    def get_object_pool(self, maximum_set_size: int, rng):
+        return self._sparql.get_object_pool(maximum_set_size, rng)
+
     def get_balanced_predicate_batches(self):
         return self._sparql.get_balanced_predicate_batches()
+
+    def triple_exists(self, subject, predicate, object) -> bool:
+        return self._sparql.triple_exists(subject, predicate, object)
 
     def get_triples(self, subject=None, predicate=None, object=None):
         # No caching because cache hit is unlikely
         return self._sparql.get_triples(subject, predicate, object)
+
+    def get_types_batched(self, subjects, type_predicate):
+        unknown_subjects = set()
+        known_subjects: dict = { subject: set() for subject in subjects }
+        for subject in subjects:
+            cache = self._type_cache.get(subject, None)
+            if cache:
+                known_subjects[subject].update(cache)
+            else:
+                unknown_subjects.add(subject)
+
+        new_types = self._sparql.get_types_batched(unknown_subjects, type_predicate)
+        for subject, types in new_types.items():
+            self._type_cache[subject] = types
+            known_subjects[subject].update(types)
+
+        return known_subjects
 
     def get_type(self, subject, type_predicate):
         cache = self._type_cache.get(subject, None)
@@ -72,8 +98,8 @@ class HybridKG(Graph):
     def is_literal(self, object):
         return self._sparql.is_literal(object)
 
-    def is_valid_comp(self, node):
-        return self._sparql.is_valid_comp(node)
+    def is_valid_comp(self, triple):
+        return self._sparql.is_valid_comp(triple)
 
     def literal_type(self, node):
         return self._sparql.literal_type(node)

@@ -11,14 +11,6 @@ from RuleMining import mine_rules
 from NegativeExampleGeneration import generate_negative_triples
 from KnowledgeGraph.MemoryKG import MemoryKG
 from Validation import shacl_validation
-from viztracer import VizTracer
-
-# tracer = VizTracer(
-#     output_file="result.json",
-#     min_duration=0.001,
-#     max_stack_depth=10,
-#     pid_suffix=True,
-# )
 
 parser = argparse.ArgumentParser(description="Mines rules from a knowledge graph while being constraint and ontology aware.")
 
@@ -30,7 +22,7 @@ parser.add_argument("--kg-path",
                     help="The path to the knowledge graph file (.nt). This is required if --kg-access-method is 'memory' or 'memory-numerical'.")
 parser.add_argument("--sparql-access-url",
                     type=str,
-                    help="The URL to the SPARQL endpoint to access the knowledge graph. This is required if --kg-access-method is 'hybrid' or 'SPARQL'.")
+                    help="The URL to the SPARQL endpoint to access the knowledge graph. This is required if --kg-access-method is 'hybrid' or 'sparql'.")
 parser.add_argument("--constraint-path",
                     required=True,
                     type=Path,
@@ -45,42 +37,37 @@ parser.add_argument("--result-path",
                     help="The path to the directory to store the results")
 parser.add_argument("--kg-access-method",
                     choices=["memory", "memory-numerical", "hybrid", "sparql"],
-                    default="memory-numerical",
+                    default="memory",
                     help="The method used to access the knowledge graph")
 parser.add_argument("--prefix",
+                    required=True,
                     type=str,
-                    help="The most common prefix used in the knowledge graph for example 'http://example.com/'\nThis is only relevant if --kg-access-method is 'memory' or 'memory-numerical' since it has no effect on the other approaches")
+                    help="The most common prefix used in the knowledge graph for example 'http://example.com/'")
 parser.add_argument("--max-body-length",
                     type=int,
                     default=3,
                     help="Maximum number of atoms in a rule body")
-parser.add_argument("--ontology-valid",
-                    action="store_true",
-                    help="Set this option if ontology is valid. This will skip the validation step")
 parser.add_argument("--example-set-size",
                     type=int,
                     default=20,
                     help="The size of the example set used during rule mining")
-parser.add_argument("--overwrite",
-                    action="store_true",
-                    help="Set this option to overwrite existing files.")
 parser.add_argument("--output-as",
                     type=str,
                     choices=["csv", "tsv", "ana"],
                     default="csv",
-                    help="Set this option to write the results in the specified file format to a file in --result_path")
+                    help="Set this option to write the results in the specified format to a file in --result_path")
 parser.add_argument("--multiprocess",
                     action="store_true",
                     help="Set this option if you want to use multiprocessing")
 parser.add_argument("--workers",
                     type=int,
-                    default=10,
+                    default=5,
                     help="Number of worker processes to use. Only used if --multiprocess is set")
 parser.add_argument("--mine-negative-rules",
                     action="store_true",
                     help="Set this option if negative rules should be mined")
 
-def create_graph(arguments) -> Graph:
+def create_graph() -> Graph:
     match arguments.kg_access_method:
         case "memory":
             return MemoryKG(arguments.kg_path, arguments.prefix)
@@ -104,7 +91,7 @@ if __name__ == '__main__':
     print("SHACL validation took: ", time.time() - start_validation)
 
     start_graph = time.time()
-    graph = create_graph(arguments)
+    graph = create_graph()
     print("Graph created in: ", time.time() - start_graph)
 
     # Negative Example Generation
@@ -116,14 +103,13 @@ if __name__ == '__main__':
     del negative_triples
     ontology = parse_ontology(arguments.ontology_path)
     graph.freeze(multiprocess=arguments.multiprocess, workers=arguments.workers)
-    # tracer.start()
+    # Rule Mining
     start_rule_mining = time.time()
+    print("Started mining rules in: ", start_rule_mining - start_time)
     rules = mine_rules(knowledge_graph=graph, ontology=ontology, set_size=arguments.example_set_size, max_depth=arguments.max_body_length, alpha=0.5, multiprocessing=arguments.multiprocess, workers=arguments.workers, mine_negative=arguments.mine_negative_rules)
 
     print(f"Mined {len(rules)} rules in: {time.time() - start_rule_mining}")
     print("Total time: ", time.time() - start_time)
-    # tracer.stop()
-    # tracer.save()
     for rule in rules:
         print(rule)
     match arguments.output_as:

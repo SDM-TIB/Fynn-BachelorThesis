@@ -7,7 +7,6 @@ from Ontology import Ontology
 def get_examples(knowledge_graph: Graph, predicate, edges, set_size, ontology: Ontology, type_predicate) -> set[tuple]:
     examples = set()
 
-    # edges = knowledge_graph.get_edges(predicate)
     for subject, object in edges:
         pair = (subject, object)
         triple = (subject, predicate, object)
@@ -28,14 +27,11 @@ def get_negative_examples(knowledge_graph: Graph, predicate, edges, ontology: On
             return examples
 
     if len(examples) < set_size:
-        # print(f"{len(examples)} examples found from constraint violations\n")
         examples.update(get_LCWA_negative_examples(knowledge_graph, predicate, edges, ontology, set_size - len(examples), type_predicate))
 
-    # Not using random negative examples is probably better in terms of rule quality and runtime since random negative examples
-    # are highly unlikely to result in any examples that are semantically sound and of any real use.
-    # if len(examples) < set_size:
-    #     print(f"There aren't enough negative examples in the graph, choosing {set_size - len(examples)} random examples.\n")
-    #     examples.update(get_random_negative_examples(knowledge_graph, edges, set_size - len(examples), examples))
+    if len(examples) < set_size:
+        # print(f"There aren't enough negative examples in the graph, choosing {set_size - len(examples)} random examples.\n")
+        examples.update(get_random_negative_examples(knowledge_graph, edges, set_size - len(examples), examples))
 
     return examples
 
@@ -45,7 +41,7 @@ def get_LCWA_negative_examples(knowledge_graph, predicate, edges, ontology, coun
     forbidden_edges = set()
     subjects = set()
     objects = set()
-    # edges = knowledge_graph.get_edges(predicate)
+
     if not edges:
         return out
     if not max_attempts:
@@ -83,42 +79,34 @@ def get_LCWA_negative_examples(knowledge_graph, predicate, edges, ontology, coun
 
     return out
 
-# def get_random_negative_examples(knowledge_graph, edges, set_size, already_selected: set[tuple], max_attempts=None) -> set[tuple]:
-#     out = set()
-#     already_selected = already_selected or set()
-#     forbidden_pairs = edges
-#     rng = random.Random(30220938)
-#
-#     subset_size = max(set_size * 5, 100)
-#
-#     raw_subs = knowledge_graph.get_all_subjects()
-#     raw_objs = knowledge_graph.get_all_objects()
-#
-#     all_subs = tuple(raw_subs) if isinstance(raw_subs, set) else raw_subs
-#     all_objs = tuple(raw_objs) if isinstance(raw_objs, set) else raw_objs
-#
-#     k_subs = min(len(all_subs), subset_size)
-#     k_objs = min(len(all_objs), subset_size)
-#
-#     if k_subs == 0 or k_objs == 0:
-#         return out
-#
-#     sub_pool = rng.sample(all_subs, k_subs)
-#     obj_pool = rng.sample(all_objs, k_objs)
-#
-#     if max_attempts is None:
-#         max_attempts = set_size * 20
-#     attempts = 0
-#
-#     while len(out) < set_size and attempts < max_attempts:
-#         attempts += 1
-#         s = rng.choice(sub_pool)
-#         o = rng.choice(obj_pool)
-#         pair = (s, o)
-#
-#         if pair in forbidden_pairs or pair in already_selected or pair in out:
-#             continue
-#
-#         out.add(pair)
-#
-#     return out
+def get_random_negative_examples(knowledge_graph, edges, set_size, already_selected: set[tuple], max_attempts=None) -> set[tuple]:
+    out = set()
+    already_selected = already_selected or set()
+    forbidden_pairs = edges
+    rng = random.Random(30220938)
+
+    subset_size = max(set_size * 5, 100)
+
+    subject_pool = list(knowledge_graph.get_subject_pool(subset_size, rng))
+    if not subject_pool:
+        return out
+    object_pool = list(knowledge_graph.get_object_pool(subset_size, rng))
+    if not object_pool:
+        return out
+
+    if max_attempts is None:
+        max_attempts = set_size * 20
+    attempts = 0
+
+    while len(out) < set_size and attempts < max_attempts:
+        attempts += 1
+        s = rng.choice(subject_pool)
+        o = rng.choice(object_pool)
+        pair = (s, o)
+
+        if pair in forbidden_pairs or pair in already_selected or pair in out:
+            continue
+
+        out.add(pair)
+
+    return out
