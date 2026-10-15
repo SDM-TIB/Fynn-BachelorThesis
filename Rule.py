@@ -23,6 +23,9 @@ class Rule:
             return False
         return self.individual_body == other.individual_body and self.head == other.head and self.connections == other.connections
 
+    def set_time(self):
+        self.time = time.time()
+
     def is_valid(self) -> bool:
         head_s = self.head[0]
         head_o = self.head[2]

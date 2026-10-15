@@ -44,10 +44,6 @@ parser.add_argument("--max-body-length",
                     type=int,
                     default=3,
                     help="Maximum number of atoms in a rule body")
-parser.add_argument("--example-set-size",
-                    type=int,
-                    default=20,
-                    help="The size of the example set used during rule mining")
 parser.add_argument("--generation-set",
                     type=ast.literal_eval)
 parser.add_argument("--validation-set",

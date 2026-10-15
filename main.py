@@ -101,7 +101,9 @@ if __name__ == '__main__':
     print(f"Generated {len(negative_triples)} negative triples in: ", time.time() - negative_example_generation_start_time)
     graph.add_negative_triples(negative_triples)
     del negative_triples
+    start_parse_ontology = time.time()
     ontology = parse_ontology(arguments.ontology_path)
+    print("Parse ontology took: ", time.time() - start_parse_ontology)
     graph.freeze(multiprocess=arguments.multiprocess, workers=arguments.workers)
     # Rule Mining
     start_rule_mining = time.time()
@@ -120,6 +122,7 @@ if __name__ == '__main__':
             with open(arguments.result_path / f"{arguments.kg_name}.tsv", mode='w', newline='', encoding='utf-8') as file:
                 file.write(get_as_tsv(rules, graph.resolve_to_uri))
         case "ana":
+            print(get_for_analysis(rules,arguments.kg_name , arguments.kg_access_method, arguments.multiprocess, start_time))
             with open(arguments.result_path / f"{arguments.kg_name}_{arguments.kg_access_method}{"_MP" if arguments.multiprocess else ""}.csv", mode='w', newline='', encoding='utf-8') as file:
                 file.write(get_for_analysis(rules,arguments.kg_name , arguments.kg_access_method, arguments.multiprocess, start_time))
         case _:

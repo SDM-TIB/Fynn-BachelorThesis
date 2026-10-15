@@ -2,6 +2,9 @@ import os
 import sys
 from math import ceil
 from typing import override
+
+import numpy as np
+
 import urllib3
 import orjson
 from collections import defaultdict
@@ -122,9 +125,14 @@ class SPARQLKG(KG):
         batch_sizes = [0 for _ in range(self._workers)]
 
         for predicate, count in predicate_counts:
-            batch_min_weight_index = batch_sizes.index(min(batch_sizes))
-            batches[batch_min_weight_index].append(predicate)
-            batch_sizes[batch_min_weight_index] += count
+            min_batch_size = np.inf
+            min_batch_index = 0
+            for i, batch in enumerate(batches):
+                if (len(batch) * batch_sizes[i]) < min_batch_size:
+                    min_batch_size = len(batch) * batch_sizes[i]
+                    min_batch_index = i
+            batches[min_batch_index].append(predicate)
+            batch_sizes[min_batch_index] += count
         return tuple(tuple(batch) for batch in batches)
     #endregion
 

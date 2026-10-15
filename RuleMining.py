@@ -111,6 +111,7 @@ def mine_rules_for_target_predicate(g: set[tuple], v: set[tuple], predicate, kno
             break
 
         if r.is_valid():
+            r.set_time()
             r_out_dict[r] = rule_dict.pop(r)
             rule_weight_dict = {}
             r_out_cov_v_cardinality = [None]
