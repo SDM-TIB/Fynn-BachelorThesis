@@ -1,0 +1,32 @@
+<http://FrenchRoyalty.org/successor>(v0, v1) :- <http://FrenchRoyalty.org/predecessor>(v1, v0) -0.45
+<http://FrenchRoyalty.org/successor>(v0, v1) :- <http://FrenchRoyalty.org/child>(v0, v1) -0.05
+<http://FrenchRoyalty.org/father>(v0, v1) :- <http://FrenchRoyalty.org/parent>(v0, v1) -0.45
+<http://FrenchRoyalty.org/father>(v0, v1) :- <http://FrenchRoyalty.org/parent>(v1, v2), <http://FrenchRoyalty.org/gender>(v2, v3), <http://FrenchRoyalty.org/gender>(v0, v3) -0.05
+<http://FrenchRoyalty.org/gender>(v0, v1) :- <http://FrenchRoyalty.org/parent>(v2, v3), <http://FrenchRoyalty.org/spouse>(v0, v2), <http://FrenchRoyalty.org/gender>(v3, v1) -0.175
+<http://FrenchRoyalty.org/gender>(v0, v1) :- <http://FrenchRoyalty.org/parent>(v0, v2), <http://FrenchRoyalty.org/gender>(v2, v1) -0.1692307692307692
+<http://FrenchRoyalty.org/gender>(v0, v1) :- <http://FrenchRoyalty.org/spouse>(v2, v3), <http://FrenchRoyalty.org/parent>(v3, v0), <http://FrenchRoyalty.org/gender>(v2, v1) -0.12023809523809523
+<http://FrenchRoyalty.org/gender>(v0, v1) :- <http://FrenchRoyalty.org/gender>(v3, v1), <http://FrenchRoyalty.org/child>(v3, v2), <http://FrenchRoyalty.org/spouse>(v2, v0) -0.025
+<http://FrenchRoyalty.org/gender>(v0, v1) :- <http://FrenchRoyalty.org/mother>(v0, v2), <http://FrenchRoyalty.org/gender>(v2, v1) -0.025
+<http://FrenchRoyalty.org/gender>(v0, v1) :- <http://FrenchRoyalty.org/father>(v0, v2), <http://FrenchRoyalty.org/gender>(v2, v1) -0.025
+<http://FrenchRoyalty.org/gender>(v0, v1) :- <http://FrenchRoyalty.org/father>(v2, v0), <http://FrenchRoyalty.org/gender>(v2, v1) -0.025
+<http://FrenchRoyalty.org/gender>(v0, v1) :- <http://FrenchRoyalty.org/spouse>(v2, v3), <http://FrenchRoyalty.org/mother>(v3, v0), <http://FrenchRoyalty.org/gender>(v2, v1) -0.025
+<http://FrenchRoyalty.org/mother>(v0, v1) :- <http://FrenchRoyalty.org/parent>(v0, v1) -0.35
+<http://FrenchRoyalty.org/mother>(v0, v1) :- <http://FrenchRoyalty.org/spouse>(v1, v2), <http://FrenchRoyalty.org/parent>(v0, v2) -0.125
+<http://FrenchRoyalty.org/mother>(v0, v1) :- <http://FrenchRoyalty.org/child>(v1, v0) -0.025
+<http://FrenchRoyalty.org/name>(v0, v1) :- <http://FrenchRoyalty.org/gender>(v2, v3), <http://FrenchRoyalty.org/gender>(v0, v3), <http://FrenchRoyalty.org/name>(v2, v1) -0.025
+<http://FrenchRoyalty.org/parent>(v0, v1) :- <http://FrenchRoyalty.org/spouse>(v1, v2), <http://FrenchRoyalty.org/parent>(v0, v2) -0.225
+<http://FrenchRoyalty.org/parent>(v0, v1) :- <http://FrenchRoyalty.org/father>(v0, v1) -0.2
+<http://FrenchRoyalty.org/parent>(v0, v1) :- <http://FrenchRoyalty.org/mother>(v0, v1) -0.075
+<http://FrenchRoyalty.org/spouse>(v0, v1) :- <http://FrenchRoyalty.org/spouse>(v1, v0) -0.325
+<http://FrenchRoyalty.org/spouse>(v0, v1) :- <http://FrenchRoyalty.org/mother>(v2, v0), <http://FrenchRoyalty.org/child>(v1, v2) -0.075
+<http://FrenchRoyalty.org/spouse>(v0, v1) :- <http://FrenchRoyalty.org/name>(v2, v3), <http://FrenchRoyalty.org/parent>(v0, v2), <http://FrenchRoyalty.org/mother>(v3, v1) -0.025
+<http://FrenchRoyalty.org/child>(v0, v1) :- <http://FrenchRoyalty.org/child>(v3, v1), <http://FrenchRoyalty.org/child>(v0, v2), <http://FrenchRoyalty.org/child>(v3, v2) -0.225
+<http://FrenchRoyalty.org/child>(v0, v1) :- <http://FrenchRoyalty.org/successor>(v0, v1) -0.05
+<http://FrenchRoyalty.org/child>(v0, v1) :- <http://FrenchRoyalty.org/gender>(v1, v2), <http://FrenchRoyalty.org/father>(v3, v0), <http://FrenchRoyalty.org/gender>(v3, v2) -0.025
+<http://FrenchRoyalty.org/child>(v0, v1) :- <http://FrenchRoyalty.org/spouse>(v2, v0), <http://FrenchRoyalty.org/child>(v2, v1) -0.025
+<http://FrenchRoyalty.org/marriedTo>(v0, v1) :- <http://FrenchRoyalty.org/marriedTo>(v1, v0) -0.4
+<http://FrenchRoyalty.org/marriedTo>(v0, v1) :- <http://FrenchRoyalty.org/spouse>(v1, v0) -0.03333333333333333
+<http://FrenchRoyalty.org/marriedTo>(v0, v1) :- <http://FrenchRoyalty.org/mother>(v2, v0), <http://FrenchRoyalty.org/successor>(v1, v2) -0.03333333333333333
+<http://FrenchRoyalty.org/predecessor>(v0, v1) :- <http://FrenchRoyalty.org/successor>(v1, v0) -0.375
+<http://FrenchRoyalty.org/predecessor>(v0, v1) :- <http://FrenchRoyalty.org/gender>(v1, v2), <http://FrenchRoyalty.org/gender>(v0, v2) -0.075
+<http://FrenchRoyalty.org/predecessor>(v0, v1) :- <http://FrenchRoyalty.org/predecessor>(v0, v2), <http://FrenchRoyalty.org/predecessor>(v2, v1) -0.23214285714285715

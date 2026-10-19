@@ -1,0 +1,42 @@
+<http://yago-knowledge.org/resource/isAffiliatedTo>(v0, v1) :- <http://yago-knowledge.org/resource/hasGender>(v1, v2), <http://yago-knowledge.org/resource/hasGender>(v0, v2) -0.1
+<http://yago-knowledge.org/resource/isAffiliatedTo>(v0, v1) :- <http://yago-knowledge.org/resource/playsFor>(v0, v1) -0.05
+<http://yago-knowledge.org/resource/isAffiliatedTo>(v0, v1) :- <http://yago-knowledge.org/resource/isMarriedTo>(v0, v1) -0.025
+<http://yago-knowledge.org/resource/diedIn>(v0, v1) :- <http://yago-knowledge.org/resource/isLocatedIn>(v2, v1), <http://yago-knowledge.org/resource/graduatedFrom>(v0, v2) -0.025
+<http://yago-knowledge.org/resource/diedIn>(v0, v1) :- <http://yago-knowledge.org/resource/diedIn>(v2, v1), <http://yago-knowledge.org/resource/influences>(v0, v2) -0.025
+<http://yago-knowledge.org/resource/diedIn>(v0, v1) :- <http://yago-knowledge.org/resource/hasCapital>(v2, v1), <http://yago-knowledge.org/resource/isPoliticianOf>(v0, v2) -0.025
+<http://yago-knowledge.org/resource/hasGender>(v0, v1) :- <http://yago-knowledge.org/resource/hasChild>(v0, v2), <http://yago-knowledge.org/resource/hasGender>(v2, v1) -0.05
+<http://yago-knowledge.org/resource/hasGender>(v0, v1) :- <http://yago-knowledge.org/resource/hasGender>(v2, v1), <http://yago-knowledge.org/resource/influences>(v0, v2) -0.025
+<http://yago-knowledge.org/resource/actedIn>(v0, v1) :- <http://yago-knowledge.org/resource/directed>(v0, v1) -0.025
+<http://yago-knowledge.org/resource/happenedIn>(v0, v1) :- <http://yago-knowledge.org/resource/isLocatedIn>(v0, v1) -0.175
+<http://yago-knowledge.org/resource/happenedIn>(v0, v1) :- <http://yago-knowledge.org/resource/isLocatedIn>(v2, v1), <http://yago-knowledge.org/resource/happenedIn>(v0, v2) -0.025
+<http://yago-knowledge.org/resource/happenedIn>(v0, v1) :- <http://yago-knowledge.org/resource/participatedIn>(v1, v0) -0.375
+<http://yago-knowledge.org/resource/hasChild>(v0, v1) :- <http://yago-knowledge.org/resource/hasGender>(v1, v2), <http://yago-knowledge.org/resource/hasGender>(v0, v2) -0.05
+<http://yago-knowledge.org/resource/hasChild>(v0, v1) :- <http://yago-knowledge.org/resource/isMarriedTo>(v0, v2), <http://yago-knowledge.org/resource/hasChild>(v2, v1) -0.025
+<http://yago-knowledge.org/resource/hasChild>(v0, v1) :- <http://yago-knowledge.org/resource/isPoliticianOf>(v0, v2), <http://yago-knowledge.org/resource/isPoliticianOf>(v1, v2) -0.4
+<http://yago-knowledge.org/resource/influences>(v0, v1) :- <http://yago-knowledge.org/resource/hasGender>(v1, v2), <http://yago-knowledge.org/resource/hasGender>(v0, v2) -0.05
+<http://yago-knowledge.org/resource/influences>(v0, v1) :- <http://yago-knowledge.org/resource/influences>(v2, v1), <http://yago-knowledge.org/resource/influences>(v0, v2) -0.025
+<http://yago-knowledge.org/resource/influences>(v0, v1) :- <http://yago-knowledge.org/resource/wasBornIn>(v0, v2), <http://yago-knowledge.org/resource/diedIn>(v1, v2) -0.025
+<http://yago-knowledge.org/resource/wroteMusicFor>(v0, v1) :- <http://yago-knowledge.org/resource/isMarriedTo>(v0, v2), <http://yago-knowledge.org/resource/directed>(v2, v1) -0.025
+<http://yago-knowledge.org/resource/directed>(v0, v1) :- <http://yago-knowledge.org/resource/actedIn>(v0, v1) -0.05
+<http://yago-knowledge.org/resource/directed>(v0, v1) :- <http://yago-knowledge.org/resource/isMarriedTo>(v0, v2), <http://yago-knowledge.org/resource/actedIn>(v2, v1) -0.025
+<http://yago-knowledge.org/resource/edited>(v0, v1) :- <http://yago-knowledge.org/resource/directed>(v0, v1) -0.075
+<http://yago-knowledge.org/resource/dealsWith>(v0, v1) :- <http://yago-knowledge.org/resource/dealsWith>(v0, v2), <http://yago-knowledge.org/resource/dealsWith>(v2, v1) -0.45
+<http://yago-knowledge.org/resource/livesIn>(v0, v1) :- <http://yago-knowledge.org/resource/diedIn>(v0, v1) -0.075
+<http://yago-knowledge.org/resource/livesIn>(v0, v1) :- <http://yago-knowledge.org/resource/hasAcademicAdvisor>(v2, v0), <http://yago-knowledge.org/resource/wasBornIn>(v2, v1) -0.025
+<http://yago-knowledge.org/resource/livesIn>(v0, v1) :- <http://yago-knowledge.org/resource/isLocatedIn>(v2, v1), <http://yago-knowledge.org/resource/graduatedFrom>(v0, v2) -0.025
+<http://yago-knowledge.org/resource/isMarriedTo>(v0, v1) :- <http://yago-knowledge.org/resource/isMarriedTo>(v1, v0) -0.5
+<http://yago-knowledge.org/resource/worksAt>(v0, v1) :- <http://yago-knowledge.org/resource/graduatedFrom>(v0, v1) -0.125
+<http://yago-knowledge.org/resource/worksAt>(v0, v1) :- <http://yago-knowledge.org/resource/graduatedFrom>(v2, v1), <http://yago-knowledge.org/resource/influences>(v0, v2) -0.025
+<http://yago-knowledge.org/resource/worksAt>(v0, v1) :- <http://yago-knowledge.org/resource/worksAt>(v2, v1), <http://yago-knowledge.org/resource/hasAcademicAdvisor>(v0, v2) -0.025
+<http://yago-knowledge.org/resource/isPoliticianOf>(v0, v1) :- <http://yago-knowledge.org/resource/hasChild>(v0, v2), <http://yago-knowledge.org/resource/isPoliticianOf>(v2, v1) -0.25
+<http://yago-knowledge.org/resource/isPoliticianOf>(v0, v1) :- <http://yago-knowledge.org/resource/isPoliticianOf>(v2, v1), <http://yago-knowledge.org/resource/hasChild>(v2, v0) -0.075
+<http://yago-knowledge.org/resource/isPoliticianOf>(v0, v1) :- <http://yago-knowledge.org/resource/isCitizenOf>(v0, v2), <http://yago-knowledge.org/resource/dealsWith>(v2, v1) -0.025
+<http://yago-knowledge.org/resource/isPoliticianOf>(v0, v1) :- <http://yago-knowledge.org/resource/isCitizenOf>(v2, v1), <http://yago-knowledge.org/resource/hasChild>(v0, v2) -0.025
+<http://yago-knowledge.org/resource/isPoliticianOf>(v0, v1) :- <http://yago-knowledge.org/resource/isCitizenOf>(v0, v1) -0.025
+<http://yago-knowledge.org/resource/isCitizenOf>(v0, v1) :- <http://yago-knowledge.org/resource/isCitizenOf>(v2, v1), <http://yago-knowledge.org/resource/influences>(v0, v2) -0.075
+<http://yago-knowledge.org/resource/isCitizenOf>(v0, v1) :- <http://yago-knowledge.org/resource/isCitizenOf>(v2, v1), <http://yago-knowledge.org/resource/isMarriedTo>(v2, v0) -0.05
+<http://yago-knowledge.org/resource/isCitizenOf>(v0, v1) :- <http://yago-knowledge.org/resource/isPoliticianOf>(v0, v1) -0.025
+<http://yago-knowledge.org/resource/graduatedFrom>(v0, v1) :- <http://yago-knowledge.org/resource/worksAt>(v2, v1), <http://yago-knowledge.org/resource/hasChild>(v2, v0) -0.025
+<http://yago-knowledge.org/resource/graduatedFrom>(v0, v1) :- <http://yago-knowledge.org/resource/influences>(v2, v0), <http://yago-knowledge.org/resource/graduatedFrom>(v2, v1) -0.025
+<http://yago-knowledge.org/resource/hasAcademicAdvisor>(v0, v1) :- <http://yago-knowledge.org/resource/hasGender>(v1, v2), <http://yago-knowledge.org/resource/hasGender>(v0, v2) -0.45
+<http://yago-knowledge.org/resource/hasAcademicAdvisor>(v0, v1) :- <http://yago-knowledge.org/resource/wasBornIn>(v0, v2), <http://yago-knowledge.org/resource/diedIn>(v1, v2) -0.05

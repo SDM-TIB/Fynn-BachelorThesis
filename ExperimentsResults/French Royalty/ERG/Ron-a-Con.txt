@@ -1,0 +1,32 @@
+{'Head': '?a successor ?b', 'Body': '?b predecessor ?a'} -0.45
+{'Head': '?a successor ?b', 'Body': '?a child ?b'} -0.05
+{'Head': '?a father ?b', 'Body': '?a parent ?b'} -0.45
+{'Head': '?a father ?b', 'Body': '?b parent ?d   ?d gender ?c   ?a gender ?c'} -0.05
+{'Head': '?a gender ?b', 'Body': '?a spouse ?d   ?c gender ?b   ?d parent ?c'} -0.175
+{'Head': '?a gender ?b', 'Body': '?a parent ?c   ?c gender ?b'} -0.1692307692307692
+{'Head': '?a gender ?b', 'Body': '?d spouse ?c   ?c parent ?a   ?d gender ?b'} -0.12023809523809523
+{'Head': '?a gender ?b', 'Body': '?c spouse ?a   ?d child ?c   ?d gender ?b'} -0.025
+{'Head': '?a gender ?b', 'Body': '?c gender ?b   ?a mother ?c'} -0.025
+{'Head': '?a gender ?b', 'Body': '?c parent ?a   ?c gender ?b'} -0.025
+{'Head': '?a gender ?b', 'Body': '?c gender ?b   ?a father ?c'} -0.025
+{'Head': '?a gender ?b', 'Body': '?c child ?d   ?c mother ?a   ?d gender ?b'} -0.025
+{'Head': '?a mother ?b', 'Body': '?a parent ?b'} -0.35
+{'Head': '?a mother ?b', 'Body': '?b spouse ?c   ?a parent ?c'} -0.125
+{'Head': '?a mother ?b', 'Body': '?b child ?a'} -0.025
+{'Head': '?a name ?b', 'Body': '?d name ?b   ?d gender ?c   ?a gender ?c'} -0.025
+{'Head': '?a parent ?b', 'Body': '?b spouse ?c   ?a parent ?c'} -0.225
+{'Head': '?a parent ?b', 'Body': '?a father ?b'} -0.2
+{'Head': '?a parent ?b', 'Body': '?a mother ?b'} -0.075
+{'Head': '?a spouse ?b', 'Body': '?b spouse ?a'} -0.325
+{'Head': '?a spouse ?b', 'Body': '?b child ?c   ?c mother ?a'} -0.075
+{'Head': '?a spouse ?b', 'Body': '?a parent ?d   ?c mother ?b   ?d name ?c'} -0.025
+{'Head': '?a child ?b', 'Body': '?d child ?b   ?a child ?c   ?d child ?c'} -0.225
+{'Head': '?a child ?b', 'Body': '?a successor ?b'} -0.05
+{'Head': '?a child ?b', 'Body': '?c gender ?d   ?b gender ?d   ?c father ?a'} -0.025
+{'Head': '?a child ?b', 'Body': '?c spouse ?a   ?c child ?b'} -0.025
+{'Head': '?a marriedTo ?b', 'Body': '?b marriedTo ?a'} -0.4
+{'Head': '?a marriedTo ?b', 'Body': '?b spouse ?a'} -0.03333333333333333
+{'Head': '?a marriedTo ?b', 'Body': '?c mother ?a   ?b successor ?c'} -0.03333333333333333
+{'Head': '?a predecessor ?b', 'Body': '?b successor ?a'} -0.375
+{'Head': '?a predecessor ?b', 'Body': '?b gender ?c   ?a gender ?c'} -0.075
+{'Head': '?a predecessor ?b', 'Body': '?c predecessor ?b   ?a predecessor ?c'} -0.23214285714285715

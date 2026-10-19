@@ -1,0 +1,42 @@
+{'Head': '?a isAffiliatedTo ?b', 'Body': '?a hasGender ?c   ?b hasGender ?c'} -0.1
+{'Head': '?a isAffiliatedTo ?b', 'Body': '?a playsFor ?b'} -0.05
+{'Head': '?a isAffiliatedTo ?b', 'Body': '?a isMarriedTo ?b'} -0.025
+{'Head': '?a diedIn ?b', 'Body': '?a graduatedFrom ?c   ?c isLocatedIn ?b'} -0.025
+{'Head': '?a diedIn ?b', 'Body': '?c diedIn ?b   ?a influences ?c'} -0.025
+{'Head': '?a diedIn ?b', 'Body': '?c hasCapital ?b   ?a isPoliticianOf ?c'} -0.025
+{'Head': '?a hasGender ?b', 'Body': '?a hasChild ?c   ?c hasGender ?b'} -0.05
+{'Head': '?a hasGender ?b', 'Body': '?c hasGender ?b   ?a influences ?c'} -0.025
+{'Head': '?a actedIn ?b', 'Body': '?a directed ?b'} -0.025
+{'Head': '?a happenedIn ?b', 'Body': '?a isLocatedIn ?b'} -0.175
+{'Head': '?a happenedIn ?b', 'Body': '?c isLocatedIn ?b   ?a happenedIn ?c'} -0.025
+{'Head': '?a happenedIn ?b', 'Body': '?b participatedIn ?a'} -0.025
+{'Head': '?a hasChild ?b', 'Body': '?a hasGender ?c   ?b hasGender ?c'} -0.375
+{'Head': '?a hasChild ?b', 'Body': '?c hasChild ?b   ?c isMarriedTo ?a'} -0.05
+{'Head': '?a hasChild ?b', 'Body': '?a isPoliticianOf ?c   ?b isPoliticianOf ?c'} -0.025
+{'Head': '?a influences ?b', 'Body': '?a hasGender ?c   ?b hasGender ?c'} -0.4
+{'Head': '?a influences ?b', 'Body': '?c influences ?b   ?a influences ?c'} -0.05
+{'Head': '?a influences ?b', 'Body': '?a wasBornIn ?c   ?b diedIn ?c'} -0.025
+{'Head': '?a wroteMusicFor ?b', 'Body': '?a isMarriedTo ?c   ?c directed ?b'} -0.025
+{'Head': '?a directed ?b', 'Body': '?a actedIn ?b'} -0.05
+{'Head': '?a directed ?b', 'Body': '?a isMarriedTo ?c   ?c actedIn ?b'} -0.025
+{'Head': '?a edited ?b', 'Body': '?a directed ?b'} -0.075
+{'Head': '?a dealsWith ?b', 'Body': '?a dealsWith ?c   ?c dealsWith ?b'} -0.45
+{'Head': '?a livesIn ?b', 'Body': '?a diedIn ?b'} -0.075
+{'Head': '?a livesIn ?b', 'Body': '?c hasAcademicAdvisor ?a   ?c wasBornIn ?b'} -0.025
+{'Head': '?a livesIn ?b', 'Body': '?a graduatedFrom ?c   ?c isLocatedIn ?b'} -0.025
+{'Head': '?a isMarriedTo ?b', 'Body': '?b isMarriedTo ?a'} -0.5
+{'Head': '?a worksAt ?b', 'Body': '?a graduatedFrom ?b'} -0.125
+{'Head': '?a worksAt ?b', 'Body': '?c graduatedFrom ?b   ?a influences ?c'} -0.025
+{'Head': '?a worksAt ?b', 'Body': '?c worksAt ?b   ?a hasAcademicAdvisor ?c'} -0.025
+{'Head': '?a isPoliticianOf ?b', 'Body': '?a hasChild ?c   ?c isPoliticianOf ?b'} -0.025
+{'Head': '?a isPoliticianOf ?b', 'Body': '?c hasChild ?a   ?c isPoliticianOf ?b'} -0.075
+{'Head': '?a isPoliticianOf ?b', 'Body': '?a isCitizenOf ?c   ?c dealsWith ?b'} -0.025
+{'Head': '?a isPoliticianOf ?b', 'Body': '?a hasChild ?c   ?c isCitizenOf ?b'} -0.025
+{'Head': '?a isPoliticianOf ?b', 'Body': '?a isCitizenOf ?b'} -0.025
+{'Head': '?a isCitizenOf ?b', 'Body': '?c isCitizenOf ?b   ?a influences ?c'} -0.075
+{'Head': '?a isCitizenOf ?b', 'Body': '?c isMarriedTo ?a   ?c isCitizenOf ?b'} -0.05
+{'Head': '?a isCitizenOf ?b', 'Body': '?a isPoliticianOf ?b'} -0.025
+{'Head': '?a graduatedFrom ?b', 'Body': '?c worksAt ?b   ?c hasChild ?a'} -0.025
+{'Head': '?a graduatedFrom ?b', 'Body': '?c graduatedFrom ?b   ?c influences ?a'} -0.025
+{'Head': '?a hasAcademicAdvisor ?b', 'Body': '?a hasGender ?c   ?b hasGender ?c'} -0.45
+{'Head': '?a hasAcademicAdvisor ?b', 'Body': '?a wasBornIn ?c   ?b diedIn ?c'} -0.05
