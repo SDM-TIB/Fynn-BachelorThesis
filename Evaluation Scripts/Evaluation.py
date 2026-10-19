@@ -18,8 +18,10 @@ parser.add_argument("--type",
                     required=True)
 parser.add_argument("--at-time",
                     type=float)
+parser.add_argument("--output",
+                    type=Path)
 
-colors = ["#D62828", "#0077B6", "#2A9D8F", "#6A4C93", "#E76F00", "#4C9F38", "#C2185B", "#6D597A"]
+colors = ["#D62828", "#E76F00", "#2A9D8F", "#6A4C93", "#0077B6", "#4C9F38", "#C2185B", "#6D597A"]
 
 def load_traces_dir():
     traces = list()
@@ -45,18 +47,30 @@ def handle_traces():
     all_traces = load_traces_dir()
     for plot in plot_all_answer_traces(all_traces, colors):
         plt.legend(loc="lower right")
+        if arguments.output:
+            plot.savefig(arguments.output, dpi=300)
+            print(f"Chart saved to {arguments.output}")
         plot.show()
 
 def handle_dief_t():
     all_traces = load_traces_dir()
     metrics = metrics_from_traces(all_traces)
     exp = performance_of_approaches_with_dieft(all_traces, metrics)
-    plot_performance_of_approaches_with_dieft(exp, arguments.dataset_name, colors).show()
+    print(exp)
+    plot = plot_performance_of_approaches_with_dieft(exp, arguments.dataset_name, colors)
+    if arguments.output:
+        plot.savefig(arguments.output, dpi=300)
+        print(f"Chart saved to {arguments.output}")
+    plot.show()
 
 def handle_dief_k():
     all_traces = load_traces_dir()
     con_efficiency = continuous_efficiency_with_diefk(all_traces)
-    plot_continuous_efficiency_with_diefk(con_efficiency, arguments.dataset_name, colors).show()
+    plot = plot_continuous_efficiency_with_diefk(con_efficiency, arguments.dataset_name, colors)
+    if arguments.output:
+        plot.savefig(arguments.output, dpi=300)
+        print(f"Chart saved to {arguments.output}")
+    plot.show()
 
 if __name__ == "__main__":
     arguments = parser.parse_args()
