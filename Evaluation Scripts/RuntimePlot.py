@@ -45,20 +45,24 @@ def plot_execution_times(csv_path: Path, output: Path | None = None) -> None:
     if any(value < 0 for row in step_times for value in row):
         raise ValueError("Execution times must not be negative.")
 
+    plt.rc('font', size=14)
+
     step_names = headers[1:]
     values = np.array(step_times)
     totals = values.sum(axis=1)
 
     # Create the stacked bar chart.
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(8, 6))
 
     x = np.arange(len(approaches))
     bottom = np.zeros(len(approaches))
 
     # Use a distinct color for each processing step.
-    colors = plt.get_cmap("tab20")(
-        np.linspace(0, 1, len(step_names))
-    )
+    colors = ["#8E8AFF", "#B4C2FF"]
+    # colors = ["#2196F3", "#64D2FF"]
+    # colors = plt.get_cmap("tab20")(
+    #     np.linspace(0, 1, len(step_names))
+    # )
 
     for i, (step_name, color) in enumerate(zip(step_names, colors)):
         bars = ax.bar(
@@ -68,20 +72,20 @@ def plot_execution_times(csv_path: Path, output: Path | None = None) -> None:
             label=step_name,
             color=color,
             edgecolor="white",
-            linewidth=0.5,
+            linewidth=0,
         )
 
         # Optionally display the value inside each segment.
         for j, bar in enumerate(bars):
             height = bar.get_height()
-            if height > 0 and height >= totals[j] * 0.05:
+            if height > 0 and height >= totals[j] * 0.13:
                 ax.text(
                     bar.get_x() + bar.get_width() / 2,
                     bottom[j] + height / 2,
                     f"{height:.2f}",
                     ha="center",
                     va="center",
-                    fontsize=8,
+                    fontsize=10,
                 )
 
         bottom += values[:, i]
@@ -90,7 +94,7 @@ def plot_execution_times(csv_path: Path, output: Path | None = None) -> None:
     ax.set_xticklabels(approaches)
     ax.set_xlabel("Approach")
     ax.set_ylabel("Execution time (seconds)")
-    ax.set_title("Execution Time by Approach")
+    ax.set_title("Execution Time by Approach", fontsize=16)
     ax.set_ylim(bottom=0)
     ax.grid(axis="y", linestyle="--", alpha=0.4)
     ax.set_axisbelow(True)
@@ -100,11 +104,11 @@ def plot_execution_times(csv_path: Path, output: Path | None = None) -> None:
         ax.annotate(
             f"{total:.2f} s",
             (x[i], total),
-            xytext=(0, 5),
+            xytext=(0, 2.5),
             textcoords="offset points",
             ha="center",
             va="bottom",
-            fontsize=9,
+            fontsize=11,
         )
 
     ax.legend(
@@ -115,8 +119,9 @@ def plot_execution_times(csv_path: Path, output: Path | None = None) -> None:
     fig.tight_layout()
 
     if output:
-        fig.savefig(output, dpi=300, bbox_inches="tight")
+        fig.savefig(output, dpi=300, bbox_inches="tight", format="pdf")
         print(f"Chart saved to {output}")
+        plt.show()
     else:
         plt.show()
 

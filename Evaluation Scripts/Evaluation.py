@@ -48,7 +48,7 @@ def handle_traces():
     for plot in plot_all_answer_traces(all_traces, colors):
         plt.legend(loc="lower right")
         if arguments.output:
-            plot.savefig(arguments.output, dpi=300)
+            plot.savefig(arguments.output, format="pdf")
             print(f"Chart saved to {arguments.output}")
         plot.show()
 

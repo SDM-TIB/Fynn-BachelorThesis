@@ -66,9 +66,9 @@ def plot_memory_usage(folder: Path, output: Path, normalize_time: bool = False):
     if not dat_files:
         raise FileNotFoundError(f"No .dat files found in {folder}")
 
-    plt.rc('font', size=15)
+    plt.rc('font', size=14)
     # plt.rc('legend', fontsize=10)
-    plt.figure(figsize=(12, 7))
+    plt.figure(figsize=(10, 6))
 
     for file_path in dat_files:
         try:
@@ -108,14 +108,14 @@ def plot_memory_usage(folder: Path, output: Path, normalize_time: bool = False):
         print(f"Area of memory consumption: {area:.2f} MiB")
     plt.xlabel(
         "Runtime (%)" if normalize_time else "Time passed (seconds)",
-        fontsize=18
+
     )
-    plt.ylabel("Memory usage (MiB)", fontsize=18)
+    plt.ylabel("Memory usage (MiB)")
     plt.title(
         "Memory Traces"
         if normalize_time
         else "Memory Usage Over Time"
-        , fontsize=22
+        , fontsize=16
     )
 
     if normalize_time:
